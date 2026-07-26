@@ -1653,6 +1653,8 @@
         <projectResolve implementation="com.demonwav.mcdev.platform.mcp.fabricloom.FabricLoomProjectResolverExtension"/>
         <projectResolve
             implementation="com.demonwav.mcdev.platform.architectury.framework.ArchitecturyProjectResolverExtension"/>
+        <projectResolve
+            implementation="com.demonwav.mcdev.platform.mcp.unimined.UniminedProjectResolverExtension"/>
     </extensions>
 
     <applicationListeners>
