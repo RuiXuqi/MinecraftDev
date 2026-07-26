@@ -8,6 +8,8 @@ jobs:
   publish:
     name: Publish
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout sources
         uses: actions/checkout@v5
@@ -24,17 +26,12 @@ jobs:
         uses: gradle/actions/setup-gradle@v5
         with:
           cache-read-only: true
-      - name: Setup tokens
-        env:
-          JETBRAINS_TOKEN: ${{ secrets.JETBRAINS_TOKEN }}
-          SENTRY_TOKEN: ${{ secrets.SENTRY_TOKEN }}
+      - name: Setup Gradle properties
         shell: bash
         run: |
           mkdir -p ~/.gradle/
           echo "GRADLE_USER_HOME=$HOME/.gradle" >> "$GITHUB_ENV"
-          echo "mcdev.deploy.token=${JETBRAINS_TOKEN}" > ~/.gradle/gradle.properties
-          echo "mcdev.sentry.token=${SENTRY_TOKEN}" >> ~/.gradle/gradle.properties
-          echo "org.gradle.jvmargs=-Xmx4G" >> ~/.gradle/gradle.properties
+          echo "org.gradle.jvmargs=-Xmx4G" > ~/.gradle/gradle.properties
       - name: Get tag name
         id: get_tag
         shell: bash
@@ -44,18 +41,10 @@ jobs:
           echo tag=$tag_name >> $GITHUB_OUTPUT
           version_array=(${tag_name//-/ })
           echo release=${version_array[1]}-${version_array[0]} >> $GITHUB_OUTPUT
-      - name: Create Sentry release
-        uses: getsentry/action-release@v3
+      - name: Build plugin
+        run: ./gradlew clean :buildPlugin --stacktrace
         env:
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_TOKEN }}
-          SENTRY_ORG: mcdev
-          SENTRY_PROJECT: mcdev
-          SENTRY_URL: https://sentry.mcdev.io
-        with:
-          environment: production
-          release: ${{ steps.get_tag.outputs.release }}
-      - name: Publish plugin
-        run: ./gradlew clean :sentryUploadSourceBundleJava :publishPlugin --stacktrace
+          NO_SENTRY: "true"
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         env:
@@ -63,7 +52,7 @@ jobs:
         with:
           tag_name: ${{ steps.get_tag.outputs.tag }}
           name: 'Release ${{ steps.get_tag.outputs.release }}'
-          body: '## [View all plugin releases here.](https://plugins.jetbrains.com/plugin/8327-minecraft-development/versions/stable/)'
+          body: 'Custom build of the Minecraft Development plugin. Install via Settings → Plugins → ⚙ → Install Plugin from Disk…'
           prerelease: false
           draft: false
           files: build/distributions/*.zip
