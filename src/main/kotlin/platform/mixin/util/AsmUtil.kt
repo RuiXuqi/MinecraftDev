@@ -46,6 +46,7 @@ import com.intellij.java.syntax.parser.JavaKeywords
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.guessModuleDir
 import com.intellij.openapi.roots.CompilerModuleExtension
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.RecursionManager
@@ -229,8 +230,17 @@ fun findClassNodeByPsiClass(psiClass: PsiClass, module: Module? = psiClass.findM
                 // find compiler output
                 if (module == null) return@lockedCached null
                 val fqn = psiClass.fullQualifiedName ?: return@lockedCached null
-                var parentDir = CompilerModuleExtension.getInstance(module)?.compilerOutputPath
-                    ?: return@lockedCached null
+                // RetroFuturaGradle's patchedMc source set is only compiled by Gradle, so map its content
+                // root (build/rfg/minecraft-src/java) to Gradle's output (build/classes/java/patchedMc)
+                var parentDir = if (module.name.endsWith(".patchedMc")) {
+                    module.guessModuleDir()
+                        ?.parent?.parent?.parent
+                        ?.findFileByRelativePath("classes/java/patchedMc")
+                        ?: return@lockedCached null
+                } else {
+                    CompilerModuleExtension.getInstance(module)?.compilerOutputPath
+                        ?: return@lockedCached null
+                }
                 val packageName = fqn.substringBeforeLast('.', "")
                 if (packageName.isNotEmpty()) {
                     for (dir in packageName.split('.')) {
@@ -383,15 +393,15 @@ private fun ClassNode.constructClass(project: Project, body: String): PsiClass? 
             GlobalSearchScope.allScope(project),
         ) as? PsiCompiledElement
         )?.let { originalClass ->
-        clazz.putUserData(ClsElementImpl.COMPILED_ELEMENT, originalClass)
-    }
+            clazz.putUserData(ClsElementImpl.COMPILED_ELEMENT, originalClass)
+        }
 
     // find innermost PsiClass
     while (true) {
         clazz = clazz.innerClasses.firstOrNull()
             ?: clazz.anonymousClasses.lastOrNull()
-            ?: clazz.localClasses.lastOrNull()
-            ?: break
+                ?: clazz.localClasses.lastOrNull()
+                ?: break
     }
 
     // add type parameters from class signature
@@ -441,7 +451,13 @@ fun ClassNode.findSourceClass(project: Project, scope: GlobalSearchScope, canDec
         val stubFile = stubClass.containingFile ?: return@findQualifiedClass null
         val classFile = stubFile.virtualFile
         if (classFile != null) {
-            val sourceFile = JavaEditorFileSwapper.findSourceFile(project, classFile)
+            // In RetroFuturaGradle projects Minecraft classes are source files of the patchedMc source set,
+            // not compiled library classes
+            val sourceFile = if (classFile.extension == "java") {
+                classFile
+            } else {
+                JavaEditorFileSwapper.findSourceFile(project, classFile)
+            }
             if (sourceFile != null) {
                 val sourceClass = (PsiManager.getInstance(project).findFile(sourceFile) as? PsiJavaFile)
                     ?.classes?.firstOrNull()
@@ -701,7 +717,10 @@ fun MethodNode.findDelegateConstructorCall(): MethodInsnNode? {
     return null
 }
 
-private fun findContainingMethod(clazz: ClassNode, lambdaMethod: MethodNode): Pair<MethodNode, SourceCodeLocationInfo>? {
+private fun findContainingMethod(
+    clazz: ClassNode,
+    lambdaMethod: MethodNode
+): Pair<MethodNode, SourceCodeLocationInfo>? {
     if (!lambdaMethod.hasAccess(Opcodes.ACC_SYNTHETIC)) {
         return null
     }
@@ -720,12 +739,14 @@ private fun findContainingMethod(clazz: ClassNode, lambdaMethod: MethodNode): Pa
                     if (insn.bsmArgs.size < 3) return@nextInsn
                     insn.bsmArgs[1] as? Handle ?: return@nextInsn
                 }
+
                 "altMetafactory" -> {
                     if (insn.bsmArgs.size < 2) return@nextInsn
                     val extraArgs = insn.bsmArgs[0] as? Array<*> ?: return@nextInsn
                     if (extraArgs.size < 2) return@nextInsn
                     extraArgs[1] as? Handle ?: return@nextInsn
                 }
+
                 else -> return@nextInsn
             }
 
@@ -751,7 +772,12 @@ private fun findContainingMethod(clazz: ClassNode, lambdaMethod: MethodNode): Pa
     return null
 }
 
-private fun findAssociatedLambda(project: Project, scope: GlobalSearchScope, clazz: ClassNode, lambdaMethod: MethodNode): PsiElement? {
+private fun findAssociatedLambda(
+    project: Project,
+    scope: GlobalSearchScope,
+    clazz: ClassNode,
+    lambdaMethod: MethodNode
+): PsiElement? {
     return RecursionManager.doPreventingRecursion(lambdaMethod, false) {
         val pair = findContainingMethod(clazz, lambdaMethod) ?: return@doPreventingRecursion null
         val (containingMethod, locationInfo) = pair
@@ -963,6 +989,7 @@ fun MethodNode.findOrConstructSourceMethod(
             val copy = sourceElement.copy() as PsiLambdaExpression
             psiMethod.body?.replace(CommonJavaRefactoringUtil.expandExpressionLambdaToCodeBlock(copy))
         }
+
         is PsiMethodReferenceExpression -> {
             LambdaRefactoringUtil.createLambda(sourceElement, true)?.let {
                 psiMethod.body?.replace(CommonJavaRefactoringUtil.expandExpressionLambdaToCodeBlock(it))
@@ -1032,6 +1059,7 @@ fun MethodNode.findBodyElements(clazz: ClassNode, project: Project, scope: Globa
                         element.initializer?.let { result += it }
                     }
                 }
+
                 is PsiClassInitializer -> {
                     if (element.hasModifierProperty(PsiModifier.STATIC)) {
                         result += element.body
@@ -1060,6 +1088,7 @@ fun MethodNode.findBodyElements(clazz: ClassNode, project: Project, scope: Globa
                             element.initializer?.let { result += it }
                         }
                     }
+
                     is PsiClassInitializer -> {
                         if (!element.hasModifierProperty(PsiModifier.STATIC)) {
                             result += element.body

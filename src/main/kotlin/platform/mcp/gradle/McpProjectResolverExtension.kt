@@ -25,11 +25,13 @@ import com.demonwav.mcdev.platform.mcp.gradle.datahandler.McpModelFG3Handler
 import com.demonwav.mcdev.platform.mcp.gradle.datahandler.McpModelMDGHandler
 import com.demonwav.mcdev.platform.mcp.gradle.datahandler.McpModelNG7Handler
 import com.demonwav.mcdev.platform.mcp.gradle.datahandler.McpModelNMDHandler
+import com.demonwav.mcdev.platform.mcp.gradle.datahandler.McpModelRFGHandler
 import com.demonwav.mcdev.platform.mcp.gradle.tooling.McpModelFG2
 import com.demonwav.mcdev.platform.mcp.gradle.tooling.McpModelFG3
 import com.demonwav.mcdev.platform.mcp.gradle.tooling.McpModelMDG
 import com.demonwav.mcdev.platform.mcp.gradle.tooling.McpModelNG7
 import com.demonwav.mcdev.platform.mcp.gradle.tooling.McpModelNMD
+import com.demonwav.mcdev.platform.mcp.gradle.tooling.McpModelRFG
 import com.demonwav.mcdev.util.runGradleTask
 import com.intellij.openapi.externalSystem.model.DataNode
 import com.intellij.openapi.externalSystem.model.project.ModuleData
@@ -47,6 +49,7 @@ class McpProjectResolverExtension : AbstractProjectResolverExtension() {
         McpModelMDG::class.java,
         McpModelNG7::class.java,
         McpModelNMD::class.java,
+        McpModelRFG::class.java,
     )
 
     override fun getToolingExtensionsClasses() = extraProjectModelClasses
@@ -106,6 +109,7 @@ class McpProjectResolverExtension : AbstractProjectResolverExtension() {
             McpModelMDGHandler,
             McpModelNG7Handler,
             McpModelNMDHandler,
+            McpModelRFGHandler,
         )
     }
 }
