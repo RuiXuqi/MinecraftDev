@@ -3,6 +3,7 @@ com.demonwav.mcdev.platform.mcp.gradle.tooling.fabricloom.FabricLoomModelBuilder
 com.demonwav.mcdev.platform.mcp.gradle.tooling.mcpforge.McpModDevForgeModelBuilderImpl
 com.demonwav.mcdev.platform.mcp.gradle.tooling.neogradle.NeoGradle7ModelBuilderImpl
 com.demonwav.mcdev.platform.mcp.gradle.tooling.neomoddev.NeoModDevGradleModelBuilderImpl
+com.demonwav.mcdev.platform.mcp.gradle.tooling.unimined.UniminedModelBuilderImpl
 com.demonwav.mcdev.platform.mcp.gradle.tooling.vanillagradle.VanillaGradleModelBuilderImpl
 com.demonwav.mcdev.platform.mcp.gradle.tooling.McpModelFG2BuilderImpl
 com.demonwav.mcdev.platform.mcp.gradle.tooling.McpModelFG3BuilderImpl
