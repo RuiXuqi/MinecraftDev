@@ -21,6 +21,7 @@
 package com.demonwav.mcdev.platform.mcp.gradle.datahandler
 
 import com.demonwav.mcdev.platform.mcp.McpModuleSettings
+import com.demonwav.mcdev.platform.mcp.McpModuleSettings.AccessTransformerNamespace
 import com.demonwav.mcdev.platform.mcp.at.AtFileType
 import com.demonwav.mcdev.platform.mcp.gradle.McpModelData
 import com.demonwav.mcdev.platform.mcp.gradle.tooling.McpModelMDG
@@ -44,13 +45,7 @@ object McpModelMDGHandler : McpModelDataHandler {
     ) {
         val data = resolverCtx.getExtraProject(gradleModule, McpModelMDG::class.java) ?: return
 
-        val state = McpModuleSettings.State(
-            data.minecraftVersion,
-            data.mcpVersion,
-            data.mappingsFile?.absolutePath,
-            SrgType.TSRG,
-            data.platformVersion,
-        )
+        val state = createState(data)
 
         val ats = data.accessTransformers
         if (ats != null && ats.isNotEmpty()) {
@@ -74,4 +69,14 @@ object McpModelMDGHandler : McpModelDataHandler {
             }
         }
     }
+
+    internal fun createState(data: McpModelMDG) =
+        McpModuleSettings.State(
+            data.minecraftVersion,
+            data.mcpVersion,
+            data.mappingsFile?.absolutePath,
+            SrgType.SRG,
+            data.platformVersion,
+            AccessTransformerNamespace.NAMED,
+        )
 }
