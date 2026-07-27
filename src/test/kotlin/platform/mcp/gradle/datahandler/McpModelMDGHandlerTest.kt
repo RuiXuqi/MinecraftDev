@@ -37,7 +37,7 @@ class McpModelMDGHandlerTest {
     lateinit var tempDir: Path
 
     @Test
-    fun `MDG legacy uses standard SRG mappings and named access transformers`() {
+    fun `MDG legacy uses standard SRG mappings and intermediary access transformers`() {
         val mappingFile = tempDir.resolve("namedToIntermediate.srg")
         Files.writeString(
             mappingFile,
@@ -54,7 +54,7 @@ class McpModelMDGHandlerTest {
         val state = McpModelMDGHandler.createState(model)
 
         assertEquals(SrgType.SRG, state.srgType)
-        assertEquals(AccessTransformerNamespace.NAMED, state.accessTransformerNamespace)
+        assertEquals(AccessTransformerNamespace.INTERMEDIARY, state.accessTransformerNamespace)
 
         val mappings = state.srgType!!.srgParser.parseSrg(mappingFile)
         val namedField = MemberReference("namedField", null, "net.minecraft.Test")
