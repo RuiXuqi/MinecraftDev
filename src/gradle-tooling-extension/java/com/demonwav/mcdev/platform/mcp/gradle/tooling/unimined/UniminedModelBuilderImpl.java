@@ -35,8 +35,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public final class UniminedModelBuilderImpl implements ModelBuilderService {
 
@@ -188,7 +190,7 @@ public final class UniminedModelBuilderImpl implements ModelBuilderService {
     }
 
     private void writeSwappedSrg(Path source, Path target) throws IOException {
-        List<String> swapped = new ArrayList<>();
+        Set<String> swapped = new LinkedHashSet<>();
         for (String line : Files.readAllLines(source, StandardCharsets.UTF_8)) {
             String[] parts = line.split(" ");
             if (parts.length == 3 && ("CL:".equals(parts[0]) || "FD:".equals(parts[0]) || "PK:".equals(parts[0]))) {

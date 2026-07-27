@@ -21,6 +21,7 @@
 package com.demonwav.mcdev.platform.mcp.at.completion
 
 import com.demonwav.mcdev.facet.MinecraftFacet
+import com.demonwav.mcdev.platform.mcp.McpModuleSettings.AccessTransformerNamespace
 import com.demonwav.mcdev.platform.mcp.McpModuleType
 import com.demonwav.mcdev.platform.mcp.at.AtElementFactory
 import com.demonwav.mcdev.platform.mcp.at.AtLanguage
@@ -230,7 +231,12 @@ class AtCompletionContributor : CompletionContributor() {
 
         val mcpModule = MinecraftFacet.getInstance(module)?.getModuleOfType(McpModuleType) ?: return
 
-        val srgMap = mcpModule.mappingsManager?.mappingsNow ?: return
+        val useNamedNames =
+            mcpModule.getSettings().accessTransformerNamespace == AccessTransformerNamespace.NAMED
+        val srgMap = mcpModule.mappingsManager?.mappingsNow
+        if (!useNamedNames && srgMap == null) {
+            return
+        }
 
         val srgResult = result.withPrefixMatcher(SrgPrefixMatcher(text))
 
@@ -239,13 +245,17 @@ class AtCompletionContributor : CompletionContributor() {
                 continue
             }
 
-            val memberReference = srgMap.getIntermediaryField(field) ?: field.simpleQualifiedMemberReference
+            val memberReference = if (useNamedNames) {
+                field.simpleQualifiedMemberReference
+            } else {
+                srgMap?.getIntermediaryField(field) ?: field.simpleQualifiedMemberReference
+            }
             srgResult.addElement(
                 PrioritizedLookupElement.withPriority(
                     LookupElementBuilder
                         .create(field.name)
                         .withIcon(PlatformIcons.FIELD_ICON)
-                        .withTailText(" (${memberReference.name})", true)
+                        .withTailText(if (useNamedNames) null else " (${memberReference.name})", true)
                         .withInsertHandler handler@{ context, _ ->
                             val currentElement = context.file.findElementAt(context.startOffset) ?: return@handler
                             currentElement.replace(
@@ -258,9 +268,11 @@ class AtCompletionContributor : CompletionContributor() {
                             // TODO: Fix visibility decrease
                             PsiDocumentManager.getInstance(context.project)
                                 .doPostponedOperationsAndUnblockDocument(context.document)
-                            val comment = " # ${field.name}"
-                            context.document.insertString(context.editor.caretModel.offset, comment)
-                            context.editor.caretModel.moveCaretRelatively(comment.length, 0, false, false, false)
+                            if (!useNamedNames) {
+                                val comment = " # ${field.name}"
+                                context.document.insertString(context.editor.caretModel.offset, comment)
+                                context.editor.caretModel.moveCaretRelatively(comment.length, 0, false, false, false)
+                            }
                         },
                     1.0,
                 ),
@@ -272,12 +284,16 @@ class AtCompletionContributor : CompletionContributor() {
                 continue
             }
 
-            val memberReference = srgMap.getIntermediaryMethod(method) ?: method.qualifiedMemberReference
+            val memberReference = if (useNamedNames) {
+                method.qualifiedMemberReference
+            } else {
+                srgMap?.getIntermediaryMethod(method) ?: method.qualifiedMemberReference
+            }
             srgResult.addElement(
                 PrioritizedLookupElement.withPriority(
                     LookupElementBuilder.create(method.nameAndParameterTypes)
                         .withIcon(PlatformIcons.METHOD_ICON)
-                        .withTailText(" (${memberReference.name})", true)
+                        .withTailText(if (useNamedNames) null else " (${memberReference.name})", true)
                         .withInsertHandler handler@{ context, _ ->
                             var currentElement = context.file.findElementAt(context.startOffset) ?: return@handler
                             var counter = 0
@@ -313,9 +329,11 @@ class AtCompletionContributor : CompletionContributor() {
                             // TODO: Fix visibility decreases
                             PsiDocumentManager.getInstance(context.project)
                                 .doPostponedOperationsAndUnblockDocument(context.document)
-                            val comment = " # ${method.name}"
-                            context.document.insertString(context.editor.caretModel.offset, comment)
-                            context.editor.caretModel.moveCaretRelatively(comment.length, 0, false, false, false)
+                            if (!useNamedNames) {
+                                val comment = " # ${method.name}"
+                                context.document.insertString(context.editor.caretModel.offset, comment)
+                                context.editor.caretModel.moveCaretRelatively(comment.length, 0, false, false, false)
+                            }
                         },
                     0.0,
                 ),

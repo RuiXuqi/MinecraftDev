@@ -26,6 +26,7 @@ import com.demonwav.mcdev.platform.mcp.gradle.tooling.ReflectUtil;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import org.gradle.api.Project;
 import org.gradle.api.file.Directory;
@@ -84,22 +85,37 @@ public final class McpModDevForgeModelBuilderImpl implements ModelBuilderService
         } catch (Exception ignored) {
         }
 
-        // MDG writes all mapping artifacts to a fixed location below the build directory. The file only
-        // exists after createMinecraftArtifacts has run (MDG wires it as an IDE sync task itself).
-        File mappingsFile = null;
+        File mappingsFile = getMappingsFile(project);
+
+        return new McpModDevForgeModelImpl(
+                minecraftVersion, platformVersion, mcpVersion, mappingsFile, accessTransformers);
+    }
+
+    private static File getMappingsFile(Project project) {
         try {
-            Directory artifactsDir = project.getLayout().getBuildDirectory().dir("moddev/artifacts").getOrNull();
-            if (artifactsDir != null) {
-                File candidate = new File(artifactsDir.getAsFile(), "namedToIntermediate.tsrg");
-                if (candidate.exists()) {
-                    mappingsFile = candidate;
+            Object createArtifacts = project.getTasks().findByName("createMinecraftArtifacts");
+            Object artifacts = ReflectUtil.getProperty(createArtifacts, "additionalResults");
+            if (artifacts instanceof Provider) {
+                artifacts = ((Provider<?>) artifacts).getOrNull();
+            }
+            if (artifacts instanceof Map) {
+                Object mapping = ((Map<?, ?>) artifacts).get("namedToIntermediaryMappingSrg");
+                if (mapping instanceof File) {
+                    return (File) mapping;
                 }
             }
         } catch (Exception ignored) {
         }
 
-        return new McpModDevForgeModelImpl(
-                minecraftVersion, platformVersion, mcpVersion, mappingsFile, accessTransformers);
+        // Keep the path available on the first IDE sync, before createMinecraftArtifacts has produced the file.
+        try {
+            Directory artifactsDir = project.getLayout().getBuildDirectory().dir("moddev/artifacts").getOrNull();
+            if (artifactsDir != null) {
+                return new File(artifactsDir.getAsFile(), "namedToIntermediate.srg");
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
     }
 
     private static String getStringProperty(Object obj, String name) {
