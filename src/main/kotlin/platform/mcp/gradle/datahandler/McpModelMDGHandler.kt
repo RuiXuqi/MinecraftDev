@@ -77,6 +77,6 @@ object McpModelMDGHandler : McpModelDataHandler {
             data.mappingsFile?.absolutePath,
             SrgType.SRG,
             data.platformVersion,
-            AccessTransformerNamespace.NAMED,
+            AccessTransformerNamespace.INTERMEDIARY,
         )
 }
