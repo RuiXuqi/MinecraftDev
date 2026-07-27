@@ -21,6 +21,7 @@
 package com.demonwav.mcdev.platform.mcp.unimined
 
 import com.demonwav.mcdev.platform.mcp.McpModuleSettings
+import com.demonwav.mcdev.platform.mcp.McpModuleSettings.AccessTransformerNamespace
 import com.demonwav.mcdev.platform.mcp.at.AtFileType
 import com.demonwav.mcdev.platform.mcp.fabricloom.FabricLoomData
 import com.demonwav.mcdev.platform.mcp.gradle.McpModelData
@@ -77,9 +78,13 @@ class UniminedProjectResolverExtension : AbstractProjectResolverExtension() {
                 minecraftVersion = entry.minecraftVersion,
                 mappingFile = srgFile.absolutePath,
                 srgType = SrgType.SRG,
+                accessTransformerNamespace = AccessTransformerNamespace.NAMED,
             )
         } else {
-            McpModuleSettings.State(minecraftVersion = entry.minecraftVersion)
+            McpModuleSettings.State(
+                minecraftVersion = entry.minecraftVersion,
+                accessTransformerNamespace = AccessTransformerNamespace.NAMED,
+            )
         }
 
         val ats = entry.accessTransformers
