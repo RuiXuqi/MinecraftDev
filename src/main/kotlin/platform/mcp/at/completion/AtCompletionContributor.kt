@@ -365,8 +365,9 @@ class AtCompletionContributor : CompletionContributor() {
     }
 
     private fun handleKeyword(text: String, result: CompletionResultSet) {
+        val keywordResult = result.withPrefixMatcher(text)
         for (keyword in AtElementFactory.Keyword.softMatch(text)) {
-            result.addElement(LookupElementBuilder.create(keyword.text))
+            keywordResult.addElement(LookupElementBuilder.create(keyword.text))
         }
     }
 
