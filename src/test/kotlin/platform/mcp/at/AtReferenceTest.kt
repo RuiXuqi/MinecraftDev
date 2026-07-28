@@ -29,6 +29,7 @@ import com.demonwav.mcdev.platform.PlatformType
 import com.demonwav.mcdev.platform.mcp.McpModuleSettings
 import com.demonwav.mcdev.platform.mcp.McpModuleSettings.AccessTransformerNamespace
 import com.demonwav.mcdev.platform.mcp.McpModuleType
+import com.demonwav.mcdev.platform.mcp.at.completion.AtTypedHandlerDelegate
 import com.demonwav.mcdev.platform.mcp.srg.SrgType
 import com.intellij.codeInsight.CodeInsightSettings
 import com.intellij.codeInsight.documentation.DocumentationManager
@@ -62,6 +63,8 @@ class AtReferenceTest : BaseMinecraftTest(PlatformType.MCP) {
 
     @BeforeEach
     fun configureMcp() {
+        CodeInsightSettings.getInstance().AUTO_POPUP_COMPLETION_LOOKUP = true
+
         val mappingsFile = tempDir.resolve("named-to-intermediary.srg")
         Files.writeString(
             mappingsFile,
@@ -243,6 +246,167 @@ class AtReferenceTest : BaseMinecraftTest(PlatformType.MCP) {
     }
 
     @Test
+    fun `qualified class completion suggests and inserts the next package segment`() {
+        addTargetClass()
+        buildProject {
+            at("example_at.cfg", "public net.<caret>")
+        }
+
+        val variants = fixture.completeBasic()
+        if (!variants.isNullOrEmpty()) {
+            val packageVariant = variants.firstOrNull { "minecraft" in it.allLookupStrings }
+            assertNotNull(packageVariant, "Completion variants: ${variants.map { it.lookupString }}")
+            fixture.lookup.currentItem = packageVariant
+            fixture.finishLookup(Lookup.REPLACE_SELECT_CHAR)
+        }
+
+        assertEquals("public net.minecraft", fixture.file.text)
+    }
+
+    @Test
+    fun `qualified class completion replaces a partial package segment`() {
+        addTargetClass()
+        buildProject {
+            at("example_at.cfg", "public net.mine<caret>")
+        }
+
+        val variants = fixture.completeBasic()
+        if (!variants.isNullOrEmpty()) {
+            val packageVariant = variants.firstOrNull { "minecraft" in it.allLookupStrings }
+            assertNotNull(packageVariant, "Completion variants: ${variants.map { it.lookupString }}")
+            fixture.lookup.currentItem = packageVariant
+            fixture.finishLookup(Lookup.REPLACE_SELECT_CHAR)
+        }
+
+        assertEquals("public net.minecraft", fixture.file.text)
+    }
+
+    @Test
+    fun `qualified class completion suggests and inserts a subpackage`() {
+        addTargetClass()
+        fixture.addClass("package net.minecraft.world; public class Example {}")
+        buildProject {
+            at("example_at.cfg", "public net.minecraft.<caret>")
+        }
+
+        val variants = fixture.completeBasic().orEmpty()
+        val packageVariant = variants.firstOrNull { "world" in it.allLookupStrings }
+        assertNotNull(packageVariant, "Completion variants: ${variants.map { it.lookupString }}")
+        fixture.lookup.currentItem = packageVariant
+        fixture.finishLookup(Lookup.REPLACE_SELECT_CHAR)
+
+        assertEquals("public net.minecraft.world", fixture.file.text)
+    }
+
+    @Test
+    fun `qualified class completion inserts a space and opens member completion`() {
+        addTargetClass()
+        buildProject {
+            at("example_at.cfg", "public net.minecraft.<caret>")
+        }
+
+        TestModeFlags.runWithFlag(CompletionAutoPopupHandler.ourTestingAutopopup, true) {
+            val variants = fixture.completeBasic()
+            if (!variants.isNullOrEmpty()) {
+                val classVariant = variants.firstOrNull { "Test" in it.allLookupStrings }
+                assertNotNull(classVariant, "Completion variants: ${variants.map { it.lookupString }}")
+                fixture.lookup.currentItem = classVariant
+                fixture.finishLookup(Lookup.REPLACE_SELECT_CHAR)
+            }
+
+            PlatformTestUtil.waitWithEventsDispatching(
+                "member completion popup",
+                { LookupManager.getActiveLookup(fixture.editor)?.items?.isNotEmpty() == true },
+                5,
+            )
+        }
+
+        assertEquals("public net.minecraft.Test ", fixture.file.text)
+        val lookup = LookupManager.getActiveLookup(fixture.editor)
+        assertNotNull(lookup)
+        assertTrue(
+            lookup!!.items.any { it.`object` is PsiField || it.`object` is PsiMethod },
+            "Completion variants: ${lookup.items.map { it.lookupString }}",
+        )
+    }
+
+    @Test
+    fun `dot after a class package automatically opens package completion`() {
+        addTargetClass()
+        buildProject {
+            at("example_at.cfg", "public net<caret>")
+        }
+
+        TestModeFlags.runWithFlag(CompletionAutoPopupHandler.ourTestingAutopopup, true) {
+            fixture.type(".")
+            PlatformTestUtil.waitWithEventsDispatching(
+                "package completion popup",
+                {
+                    LookupManager.getActiveLookup(fixture.editor)?.items?.any {
+                        "minecraft" in it.allLookupStrings
+                    } == true
+                },
+                5,
+            )
+        }
+
+        assertEquals("public net.", fixture.file.text)
+        val lookup = LookupManager.getActiveLookup(fixture.editor)
+        assertNotNull(lookup)
+        assertTrue(
+            lookup!!.items.any { "minecraft" in it.allLookupStrings },
+            "Completion variants: ${lookup.items.map { it.lookupString }}",
+        )
+    }
+
+    @Test
+    fun `dot completion respects disabled automatic completion popup setting`() {
+        addTargetClass()
+        buildProject {
+            at("example_at.cfg", "public net.<caret>")
+        }
+
+        val settings = CodeInsightSettings.getInstance()
+        val previousAutoPopupSetting = settings.AUTO_POPUP_COMPLETION_LOOKUP
+        try {
+            settings.AUTO_POPUP_COMPLETION_LOOKUP = false
+            LookupManager.hideActiveLookup(project)
+            AtTypedHandlerDelegate().checkAutoPopup('.', project, fixture.editor, fixture.file)
+            PlatformTestUtil.dispatchAllEventsInIdeEventQueue()
+        } finally {
+            settings.AUTO_POPUP_COMPLETION_LOOKUP = previousAutoPopupSetting
+        }
+
+        assertEquals("public net.", fixture.file.text)
+        assertNull(LookupManager.getActiveLookup(fixture.editor))
+    }
+
+    @Test
+    fun `explicit qualified class completion works when automatic popup is disabled`() {
+        addTargetClass()
+        buildProject {
+            at("example_at.cfg", "public net.<caret>")
+        }
+
+        val settings = CodeInsightSettings.getInstance()
+        val previousAutoPopupSetting = settings.AUTO_POPUP_COMPLETION_LOOKUP
+        try {
+            settings.AUTO_POPUP_COMPLETION_LOOKUP = false
+            val variants = fixture.completeBasic()
+            if (!variants.isNullOrEmpty()) {
+                val packageVariant = variants.firstOrNull { "minecraft" in it.allLookupStrings }
+                assertNotNull(packageVariant, "Completion variants: ${variants.map { it.lookupString }}")
+                fixture.lookup.currentItem = packageVariant
+                fixture.finishLookup(Lookup.REPLACE_SELECT_CHAR)
+            }
+        } finally {
+            settings.AUTO_POPUP_COMPLETION_LOOKUP = previousAutoPopupSetting
+        }
+
+        assertEquals("public net.minecraft", fixture.file.text)
+    }
+
+    @Test
     fun `space after class name automatically opens member completion`() {
         addTargetClass()
         buildProject {
@@ -338,9 +502,11 @@ class AtReferenceTest : BaseMinecraftTest(PlatformType.MCP) {
         try {
             settings.AUTO_POPUP_COMPLETION_LOOKUP = false
             TestModeFlags.runWithFlag(CompletionAutoPopupHandler.ourTestingAutopopup, true) {
-                val variants = fixture.completeBasic().orEmpty()
-                fixture.lookup.currentItem = variants.first { it.lookupString == "net.minecraft.Test" }
-                fixture.finishLookup(Lookup.REPLACE_SELECT_CHAR)
+                val variants = fixture.completeBasic()
+                if (!variants.isNullOrEmpty()) {
+                    fixture.lookup.currentItem = variants.first { it.lookupString == "net.minecraft.Test" }
+                    fixture.finishLookup(Lookup.REPLACE_SELECT_CHAR)
+                }
                 PlatformTestUtil.dispatchAllEventsInIdeEventQueue()
             }
         } finally {
@@ -355,17 +521,16 @@ class AtReferenceTest : BaseMinecraftTest(PlatformType.MCP) {
     fun `space after class name respects disabled automatic completion popup setting`() {
         addTargetClass()
         buildProject {
-            at("example_at.cfg", "public net.minecraft.Test<caret>")
+            at("example_at.cfg", "public net.minecraft.Test <caret>")
         }
 
         val settings = CodeInsightSettings.getInstance()
         val previousAutoPopupSetting = settings.AUTO_POPUP_COMPLETION_LOOKUP
         try {
             settings.AUTO_POPUP_COMPLETION_LOOKUP = false
-            TestModeFlags.runWithFlag(CompletionAutoPopupHandler.ourTestingAutopopup, true) {
-                fixture.type(" ")
-                PlatformTestUtil.dispatchAllEventsInIdeEventQueue()
-            }
+            LookupManager.hideActiveLookup(project)
+            AtTypedHandlerDelegate().checkAutoPopup(' ', project, fixture.editor, fixture.file)
+            PlatformTestUtil.dispatchAllEventsInIdeEventQueue()
         } finally {
             settings.AUTO_POPUP_COMPLETION_LOOKUP = previousAutoPopupSetting
         }
