@@ -221,6 +221,10 @@ class AtReferenceTest : BaseMinecraftTest(PlatformType.MCP) {
         assertTrue("public" in lookupStrings, "Completion variants: $lookupStrings")
         assertTrue("public-f" in lookupStrings, "Completion variants: $lookupStrings")
         assertTrue("public+f" in lookupStrings, "Completion variants: $lookupStrings")
+
+        fixture.lookup.currentItem = variants.first { it.lookupString == "public" }
+        fixture.finishLookup(Lookup.REPLACE_SELECT_CHAR)
+        assertEquals("public", fixture.file.text)
     }
 
     @Test
