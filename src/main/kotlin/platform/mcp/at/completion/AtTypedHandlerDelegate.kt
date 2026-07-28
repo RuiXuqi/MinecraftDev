@@ -36,17 +36,12 @@ class AtTypedHandlerDelegate : TypedHandlerDelegate() {
         }
 
         if (charTyped == ' ') {
-            AutoPopupController.getInstance(project).scheduleAutoPopup(editor) {
-                val classNameEndOffset = editor.caretModel.offset - 1
-                if (classNameEndOffset <= 0) {
-                    return@scheduleAutoPopup false
-                }
-                val element = it.findElementAt(classNameEndOffset - 1)
-                val className = element?.let { current ->
-                    PsiTreeUtil.getParentOfType(current, AtClassName::class.java, false)
-                }
-                className?.textRange?.endOffset == classNameEndOffset
-            }
+            scheduleClassNameAutoPopup(project, editor, trailingCharacterCount = 1)
+            return Result.CONTINUE
+        }
+
+        if (charTyped == '.') {
+            scheduleClassNameAutoPopup(project, editor, trailingCharacterCount = 0)
             return Result.CONTINUE
         }
 
@@ -55,5 +50,20 @@ class AtTypedHandlerDelegate : TypedHandlerDelegate() {
         }
 
         return super.checkAutoPopup(charTyped, project, editor, file)
+    }
+
+    private fun scheduleClassNameAutoPopup(project: Project, editor: Editor, trailingCharacterCount: Int) {
+        AutoPopupController.getInstance(project).scheduleAutoPopup(editor) {
+            val classNameEndOffset = editor.caretModel.offset - trailingCharacterCount
+            if (classNameEndOffset <= 0) {
+                return@scheduleAutoPopup false
+            }
+
+            val element = it.findElementAt(classNameEndOffset - 1)
+            val className = element?.let { current ->
+                PsiTreeUtil.getParentOfType(current, AtClassName::class.java, false)
+            }
+            className?.textRange?.endOffset == classNameEndOffset
+        }
     }
 }

@@ -25,6 +25,7 @@ import com.demonwav.mcdev.platform.mcp.McpModuleType
 import com.demonwav.mcdev.platform.mcp.at.AtElementFactory
 import com.demonwav.mcdev.platform.mcp.at.AtLanguage
 import com.demonwav.mcdev.platform.mcp.at.AtNamespaceMapper
+import com.demonwav.mcdev.platform.mcp.at.gen.psi.AtClassName
 import com.demonwav.mcdev.platform.mcp.at.gen.psi.AtEntry
 import com.demonwav.mcdev.platform.mcp.at.gen.psi.AtFieldName
 import com.demonwav.mcdev.platform.mcp.at.gen.psi.AtFunction
@@ -54,6 +55,7 @@ import com.intellij.patterns.PlatformPatterns.elementType
 import com.intellij.patterns.PlatformPatterns.psiElement
 import com.intellij.patterns.PsiElementPattern
 import com.intellij.psi.JavaPsiFacade
+import com.intellij.psi.CommonReferenceProviderTypes
 import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiElement
@@ -64,6 +66,7 @@ import com.intellij.psi.tree.TokenSet
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.util.PsiUtilCore
 import com.intellij.util.PlatformIcons
+import com.intellij.util.ProcessingContext
 
 class AtCompletionContributor : CompletionContributor() {
 
@@ -99,7 +102,13 @@ class AtCompletionContributor : CompletionContributor() {
 
         when {
             afterKeyword -> {
-                handleAtClassName(text, module ?: return, result)
+                handleAtClassName(
+                    parent as? AtClassName ?: return,
+                    text,
+                    findClassSegmentPrefix(parameters),
+                    module ?: return,
+                    result,
+                )
             }
 
             afterClassName -> {
@@ -114,24 +123,29 @@ class AtCompletionContributor : CompletionContributor() {
         }
     }
 
-    private fun handleAtClassName(text: String, module: Module, result: CompletionResultSet) {
+    private fun handleAtClassName(
+        className: AtClassName,
+        text: String,
+        segmentPrefix: String,
+        module: Module,
+        result: CompletionResultSet,
+    ) {
         if (text.isEmpty()) {
             return
         }
 
-        val currentPackage = text.substringBeforeLast('.', "")
-        val beginning = text.substringAfterLast('.')
-
-        if (beginning == "") {
-            return
-        }
+        val currentSegmentPrefix = segmentPrefix.ifEmpty { text.substringAfterLast('.') }
 
         val scope = GlobalSearchScope.moduleWithDependenciesAndLibrariesScope(module)
         val project = module.project
 
+        if (!text.contains('$')) {
+            addQualifiedClassVariants(className, text, result)
+        }
+
         // Short name completion
         if (!text.contains('.')) {
-            val classResult = result.withPrefixMatcher(beginning)
+            val classResult = result.withPrefixMatcher(currentSegmentPrefix)
             AllClassesGetter.processJavaClasses(classResult.prefixMatcher, project, scope) { psiClass ->
                 val name = psiClass.fullQualifiedName ?: return@processJavaClasses true
                 classResult.addElement(createClassLookupElement(psiClass, name))
@@ -145,7 +159,9 @@ class AtCompletionContributor : CompletionContributor() {
                 JavaPsiFacade.getInstance(project).findClass(text.substringBeforeLast('$'), scope) ?: return
 
             for (innerClass in currentClass.allInnerClasses) {
-                if (innerClass.name?.contains(beginning.substringAfterLast('$'), ignoreCase = true) != true) {
+                if (
+                    innerClass.name?.contains(currentSegmentPrefix.substringAfterLast('$'), ignoreCase = true) != true
+                ) {
                     continue
                 }
 
@@ -180,47 +196,39 @@ class AtCompletionContributor : CompletionContributor() {
 
             return
         }
+    }
 
-        val psiPackage = JavaPsiFacade.getInstance(project).findPackage(currentPackage) ?: return
-
-        // Classes in package completion
-        val packageResult = result.withPrefixMatcher(beginning)
-        val used = mutableSetOf<String>()
-        for (psiClass in psiPackage.getClasses(scope)) {
-            val className = psiClass.name ?: continue
-
-            if (!packageResult.prefixMatcher.prefixMatches(className) || className == "package-info") {
-                continue
+    private fun addQualifiedClassVariants(
+        className: AtClassName,
+        classNameText: String,
+        result: CompletionResultSet,
+    ) {
+        val provider = CommonReferenceProviderTypes.getInstance().classReferenceProvider
+        val reference = provider.getReferencesByElement(className, ProcessingContext()).lastOrNull() ?: return
+        for (variant in reference.variants) {
+            val lookupElement = variant as? LookupElement ?: continue
+            val qualifier = classNameText.substringBeforeLast('.', "")
+            val qualifiedLookupString = if (qualifier.isEmpty()) {
+                lookupElement.lookupString
+            } else {
+                "$qualifier.${lookupElement.lookupString}"
             }
-
-            if (!used.add(className)) {
-                continue
-            }
-
-            val name = psiClass.fullQualifiedName ?: continue
-            packageResult.addElement(
-                PrioritizedLookupElement.withPriority(
-                    createClassLookupElement(psiClass, name),
-                    1.0,
-                ),
-            )
+            val decorated = (if (lookupElement.`object` is PsiClass) {
+                lookupElement.withSpaceTail().withMemberAutoPopup()
+            } else {
+                lookupElement
+            }).withQualifiedLookupString(qualifiedLookupString)
+                .withClassNameReplacement(className.textRange.startOffset, qualifiedLookupString)
+            result.addElement(decorated)
         }
-        // Packages in package completion
-        for (subPackage in psiPackage.getSubPackages(scope)) {
-            val packageName = subPackage.name ?: continue
+    }
 
-            if (!packageResult.prefixMatcher.prefixMatches(packageName)) {
-                continue
-            }
-
-            val name = subPackage.qualifiedName
-            packageResult.addElement(
-                PrioritizedLookupElement.withPriority(
-                    LookupElementBuilder.create(subPackage, name).withIcon(PlatformIcons.PACKAGE_ICON),
-                    0.0,
-                ),
-            )
-        }
+    private fun findClassSegmentPrefix(parameters: CompletionParameters): String {
+        val offset = parameters.editor.caretModel.offset
+        val element = parameters.originalFile.findElementAt(offset - 1) ?: return ""
+        val className = PsiTreeUtil.getParentOfType(element, AtClassName::class.java, false) ?: return ""
+        val offsetInClassName = (offset - className.textRange.startOffset).coerceIn(0, className.textLength)
+        return className.text.take(offsetInClassName).substringAfterLast('.')
     }
 
     private fun handleAtName(text: String, entry: AtEntry, module: Module, result: CompletionResultSet) {
@@ -365,6 +373,29 @@ class AtCompletionContributor : CompletionContributor() {
                 }
             }
         }
+
+    private fun LookupElement.withQualifiedLookupString(qualifiedLookupString: String): LookupElement =
+        object : LookupElementDecorator<LookupElement>(this) {
+            override fun getLookupString(): String = qualifiedLookupString
+
+            override fun getAllLookupStrings(): Set<String> =
+                super.getAllLookupStrings() + qualifiedLookupString
+        }
+
+    private fun LookupElement.withClassNameReplacement(
+        classNameStartOffset: Int,
+        qualifiedLookupString: String,
+    ): LookupElement = object : LookupElementDecorator<LookupElement>(this) {
+        override fun handleInsert(context: InsertionContext) {
+            if (classNameStartOffset <= context.tailOffset) {
+                context.document.replaceString(classNameStartOffset, context.tailOffset, qualifiedLookupString)
+                context.tailOffset = classNameStartOffset + qualifiedLookupString.length
+                context.commitDocument()
+            }
+
+            super.handleInsert(context)
+        }
+    }
 
     object Const {
         private fun after(type: IElementType): PsiElementPattern.Capture<PsiElement> =
