@@ -658,8 +658,6 @@
         <typedHandler implementation="com.demonwav.mcdev.platform.mcp.at.completion.AtTypedHandlerDelegate"/>
         <completion.contributor language="Access Transformers"
                                 implementationClass="com.demonwav.mcdev.platform.mcp.at.completion.AtCompletionContributor"/>
-        <gotoDeclarationHandler implementation="com.demonwav.mcdev.platform.mcp.at.AtGotoDeclarationHandler"/>
-        <annotator language="Access Transformers" implementationClass="com.demonwav.mcdev.platform.mcp.at.AtAnnotator"/>
 
         <!-- class tweaker file type -->
         <fileType name="Class Tweaker" language="Class Tweaker"
