@@ -246,21 +246,39 @@ class AtReferenceTest : BaseMinecraftTest(PlatformType.MCP) {
     }
 
     @Test
-    fun `qualified class completion suggests and inserts the next package segment`() {
+    fun `qualified class completion inserts a package dot and opens the next segment completion`() {
         addTargetClass()
         buildProject {
             at("example_at.cfg", "public net.<caret>")
         }
 
-        val variants = fixture.completeBasic()
-        if (!variants.isNullOrEmpty()) {
-            val packageVariant = variants.firstOrNull { "minecraft" in it.allLookupStrings }
-            assertNotNull(packageVariant, "Completion variants: ${variants.map { it.lookupString }}")
-            fixture.lookup.currentItem = packageVariant
-            fixture.finishLookup(Lookup.REPLACE_SELECT_CHAR)
+        TestModeFlags.runWithFlag(CompletionAutoPopupHandler.ourTestingAutopopup, true) {
+            val variants = fixture.completeBasic()
+            if (!variants.isNullOrEmpty()) {
+                val packageVariant = variants.firstOrNull { "minecraft" in it.allLookupStrings }
+                assertNotNull(packageVariant, "Completion variants: ${variants.map { it.lookupString }}")
+                fixture.lookup.currentItem = packageVariant
+                fixture.finishLookup(Lookup.REPLACE_SELECT_CHAR)
+            }
+
+            PlatformTestUtil.waitWithEventsDispatching(
+                "next class segment completion popup",
+                {
+                    LookupManager.getActiveLookup(fixture.editor)?.items?.any {
+                        "Test" in it.allLookupStrings
+                    } == true
+                },
+                5,
+            )
         }
 
-        assertEquals("public net.minecraft", fixture.file.text)
+        assertEquals("public net.minecraft.", fixture.file.text)
+        val lookup = LookupManager.getActiveLookup(fixture.editor)
+        assertNotNull(lookup)
+        assertTrue(
+            lookup!!.items.any { "Test" in it.allLookupStrings },
+            "Completion variants: ${lookup.items.map { it.lookupString }}",
+        )
     }
 
     @Test
@@ -278,7 +296,7 @@ class AtReferenceTest : BaseMinecraftTest(PlatformType.MCP) {
             fixture.finishLookup(Lookup.REPLACE_SELECT_CHAR)
         }
 
-        assertEquals("public net.minecraft", fixture.file.text)
+        assertEquals("public net.minecraft.", fixture.file.text)
     }
 
     @Test
@@ -295,7 +313,7 @@ class AtReferenceTest : BaseMinecraftTest(PlatformType.MCP) {
         fixture.lookup.currentItem = packageVariant
         fixture.finishLookup(Lookup.REPLACE_SELECT_CHAR)
 
-        assertEquals("public net.minecraft.world", fixture.file.text)
+        assertEquals("public net.minecraft.world.", fixture.file.text)
     }
 
     @Test
@@ -403,7 +421,7 @@ class AtReferenceTest : BaseMinecraftTest(PlatformType.MCP) {
             settings.AUTO_POPUP_COMPLETION_LOOKUP = previousAutoPopupSetting
         }
 
-        assertEquals("public net.minecraft", fixture.file.text)
+        assertEquals("public net.minecraft.", fixture.file.text)
     }
 
     @Test

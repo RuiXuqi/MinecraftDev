@@ -48,6 +48,7 @@ import com.intellij.codeInsight.completion.PrioritizedLookupElement
 import com.intellij.codeInsight.lookup.LookupElement
 import com.intellij.codeInsight.lookup.LookupElementBuilder
 import com.intellij.codeInsight.lookup.LookupElementDecorator
+import com.intellij.codeInsight.lookup.PackageLookupItem
 import com.intellij.codeInsight.lookup.TailTypeDecorator
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.module.ModuleUtilCore
@@ -59,6 +60,7 @@ import com.intellij.psi.CommonReferenceProviderTypes
 import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiPackage
 import com.intellij.psi.PsiWhiteSpace
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.tree.IElementType
@@ -213,11 +215,11 @@ class AtCompletionContributor : CompletionContributor() {
             } else {
                 "$qualifier.${lookupElement.lookupString}"
             }
-            val decorated = (if (lookupElement.`object` is PsiClass) {
-                lookupElement.withSpaceTail().withMemberAutoPopup()
-            } else {
-                lookupElement
-            }).withQualifiedLookupString(qualifiedLookupString)
+            val decorated = when (val target = lookupElement.`object`) {
+                is PsiClass -> lookupElement.withSpaceTail().withMemberAutoPopup()
+                is PsiPackage -> PackageLookupItem(target, className)
+                else -> lookupElement
+            }.withQualifiedLookupString(qualifiedLookupString)
                 .withClassNameReplacement(className.textRange.startOffset, qualifiedLookupString)
             result.addElement(decorated)
         }
