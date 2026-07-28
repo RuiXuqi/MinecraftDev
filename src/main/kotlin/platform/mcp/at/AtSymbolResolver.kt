@@ -31,9 +31,13 @@ import com.demonwav.mcdev.platform.mcp.at.gen.psi.AtFieldName
 import com.demonwav.mcdev.platform.mcp.at.gen.psi.AtFuncName
 import com.demonwav.mcdev.platform.mcp.at.gen.psi.AtFunction
 import com.demonwav.mcdev.platform.mcp.at.gen.psi.AtReturnValue
+import com.demonwav.mcdev.platform.mcp.mappings.Mappings
+import com.demonwav.mcdev.util.MemberReference
 import com.demonwav.mcdev.util.findQualifiedClass
 import com.demonwav.mcdev.util.getPrimitiveType
 import com.demonwav.mcdev.util.parseClassDescriptor
+import com.demonwav.mcdev.util.qualifiedMemberReference
+import com.demonwav.mcdev.util.simpleQualifiedMemberReference
 import com.intellij.openapi.module.ModuleUtilCore
 import com.intellij.psi.JavaPsiFacade
 import com.intellij.psi.PsiElement
@@ -59,14 +63,7 @@ object AtSymbolResolver {
     private fun resolveField(source: AtFieldName): PsiField? {
         val entry = source.parent as? AtEntry ?: return null
         val reference = AtMemberReference.get(entry, source) ?: return null
-        val mcpModule = findMcpModule(source) ?: return null
-        val mappedReference = when (mcpModule.getSettings().accessTransformerNamespace) {
-            AccessTransformerNamespace.NAMED -> reference
-            AccessTransformerNamespace.INTERMEDIARY -> {
-                val mappings = mcpModule.mappingsManager?.mappingsNow ?: return null
-                mappings.getMappedField(reference)
-            }
-        }
+        val mappedReference = findNamespaceMapper(source)?.toNamedField(reference) ?: return null
         return mappedReference.resolveMember(source.project, source.resolveScope) as? PsiField
     }
 
@@ -74,14 +71,7 @@ object AtSymbolResolver {
         val function = source.parent as? AtFunction ?: return null
         val entry = function.parent as? AtEntry ?: return null
         val reference = AtMemberReference.get(entry, function) ?: return null
-        val mcpModule = findMcpModule(source) ?: return null
-        val mappedReference = when (mcpModule.getSettings().accessTransformerNamespace) {
-            AccessTransformerNamespace.NAMED -> reference
-            AccessTransformerNamespace.INTERMEDIARY -> {
-                val mappings = mcpModule.mappingsManager?.mappingsNow ?: return null
-                mappings.getMappedMethod(reference)
-            }
-        }
+        val mappedReference = findNamespaceMapper(source)?.toNamedMethod(reference) ?: return null
         return mappedReference.resolveMember(source.project, source.resolveScope) as? PsiMethod
     }
 
@@ -96,18 +86,39 @@ object AtSymbolResolver {
     }
 
     private fun mapClassName(className: String, source: PsiElement): String? {
-        val mcpModule = findMcpModule(source) ?: return null
-        return when (mcpModule.getSettings().accessTransformerNamespace) {
-            AccessTransformerNamespace.NAMED -> className
-            AccessTransformerNamespace.INTERMEDIARY -> {
-                val mappings = mcpModule.mappingsManager?.mappingsNow ?: return null
-                mappings.getMappedClass(className)
-            }
-        }
+        return findNamespaceMapper(source)?.toNamedClass(className)
     }
+
+    private fun findNamespaceMapper(source: PsiElement): AtNamespaceMapper? =
+        findMcpModule(source)?.let(AtNamespaceMapper::create)
 
     private fun findMcpModule(source: PsiElement): McpModule? {
         val module = ModuleUtilCore.findModuleForPsiElement(source) ?: return null
         return MinecraftFacet.getInstance(module)?.getModuleOfType(McpModuleType)
+    }
+}
+
+internal class AtNamespaceMapper private constructor(private val mappings: Mappings?) {
+
+    val usesNamedNames: Boolean
+        get() = mappings == null
+
+    fun toNamedClass(className: String): String = mappings?.getMappedClass(className) ?: className
+
+    fun toNamedField(reference: MemberReference): MemberReference = mappings?.getMappedField(reference) ?: reference
+
+    fun toNamedMethod(reference: MemberReference): MemberReference = mappings?.getMappedMethod(reference) ?: reference
+
+    fun fromNamed(field: PsiField): MemberReference =
+        mappings?.getIntermediaryField(field) ?: field.simpleQualifiedMemberReference
+
+    fun fromNamed(method: PsiMethod): MemberReference =
+        mappings?.getIntermediaryMethod(method) ?: method.qualifiedMemberReference
+
+    companion object {
+        fun create(module: McpModule): AtNamespaceMapper? = when (module.getSettings().accessTransformerNamespace) {
+            AccessTransformerNamespace.NAMED -> AtNamespaceMapper(null)
+            AccessTransformerNamespace.INTERMEDIARY -> module.mappingsManager?.mappingsNow?.let(::AtNamespaceMapper)
+        }
     }
 }
