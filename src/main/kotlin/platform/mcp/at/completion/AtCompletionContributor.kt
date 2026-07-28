@@ -51,6 +51,7 @@ import com.intellij.patterns.PsiElementPattern
 import com.intellij.psi.JavaPsiFacade
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiWhiteSpace
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.search.PsiShortNamesCache
 import com.intellij.psi.tree.IElementType
@@ -71,6 +72,15 @@ class AtCompletionContributor : CompletionContributor() {
             return
         }
 
+        val linePrefix = parameters.originalFile.text
+            .substring(0, parameters.offset.coerceAtMost(parameters.originalFile.textLength))
+            .substringAfterLast('\n')
+            .trimStart()
+        if (linePrefix.isEmpty() || (!linePrefix.startsWith('#') && linePrefix.none(Char::isWhitespace))) {
+            handleKeyword(linePrefix, result)
+            return
+        }
+
         val parent = position.parent
 
         val parentText = parent.text ?: return
@@ -80,7 +90,6 @@ class AtCompletionContributor : CompletionContributor() {
         val text = parentText.removeSuffix(CompletionUtil.DUMMY_IDENTIFIER_TRIMMED)
         val afterKeyword = Const.AFTER_KEYWORD.accepts(parent)
         val afterClassName = Const.AFTER_CLASS_NAME.accepts(parent)
-        val afterNewLine = Const.AFTER_NEWLINE.accepts(parent)
         val module by lazy { ModuleUtilCore.findModuleForPsiElement(parameters.originalFile) }
 
         when {
@@ -89,12 +98,14 @@ class AtCompletionContributor : CompletionContributor() {
             }
 
             afterClassName -> {
-                val originalElement = parameters.originalFile.findElementAt(parameters.offset - 1) ?: return
+                var originalElement = parameters.originalFile.findElementAt(parameters.offset - 1) ?: return
+                while (originalElement is PsiWhiteSpace) {
+                    originalElement = PsiTreeUtil.prevLeaf(originalElement, true) ?: return
+                }
                 val originalEntry = PsiTreeUtil.getParentOfType(originalElement, AtEntry::class.java) ?: return
                 handleAtName(text, originalEntry, module ?: return, result)
             }
 
-            afterNewLine -> handleNewLine(text, result)
         }
     }
 
@@ -353,7 +364,7 @@ class AtCompletionContributor : CompletionContributor() {
         }
     }
 
-    private fun handleNewLine(text: String, result: CompletionResultSet) {
+    private fun handleKeyword(text: String, result: CompletionResultSet) {
         for (keyword in AtElementFactory.Keyword.softMatch(text)) {
             result.addElement(LookupElementBuilder.create(keyword.text))
         }
@@ -381,6 +392,5 @@ class AtCompletionContributor : CompletionContributor() {
 
         val AFTER_KEYWORD = after(AtTypes.KEYWORD)
         val AFTER_CLASS_NAME = after(AtTypes.CLASS_NAME)
-        val AFTER_NEWLINE = after(AtTypes.CRLF)
     }
 }

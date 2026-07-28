@@ -31,10 +31,14 @@ import com.demonwav.mcdev.platform.mcp.McpModuleSettings.AccessTransformerNamesp
 import com.demonwav.mcdev.platform.mcp.McpModuleType
 import com.demonwav.mcdev.platform.mcp.srg.SrgType
 import com.intellij.codeInsight.documentation.DocumentationManager
+import com.intellij.codeInsight.editorActions.CompletionAutoPopupHandler
 import com.intellij.codeInsight.lookup.Lookup
+import com.intellij.codeInsight.lookup.LookupManager
 import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiField
 import com.intellij.psi.PsiMethod
+import com.intellij.testFramework.PlatformTestUtil
+import com.intellij.testFramework.TestModeFlags
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
@@ -203,6 +207,44 @@ class AtReferenceTest : BaseMinecraftTest(PlatformType.MCP) {
         val method = target as PsiMethod
         assertEquals("namedMethod", method.name)
         assertEquals("int", method.parameterList.parameters.single().type.canonicalText)
+    }
+
+    @Test
+    fun `first line completion suggests access modifier keywords`() {
+        buildProject {
+            at("example_at.cfg", "pub<caret>")
+        }
+
+        val variants = fixture.completeBasic().orEmpty()
+        val lookupStrings = variants.map { it.lookupString }
+
+        assertTrue("public" in lookupStrings, "Completion variants: $lookupStrings")
+        assertTrue("public-f" in lookupStrings, "Completion variants: $lookupStrings")
+        assertTrue("public+f" in lookupStrings, "Completion variants: $lookupStrings")
+    }
+
+    @Test
+    fun `space after class name automatically opens member completion`() {
+        addTargetClass()
+        buildProject {
+            at("example_at.cfg", "public net.minecraft.Test<caret>")
+        }
+
+        TestModeFlags.runWithFlag(CompletionAutoPopupHandler.ourTestingAutopopup, true) {
+            fixture.type(" ")
+            PlatformTestUtil.waitWithEventsDispatching(
+                "member completion popup",
+                { LookupManager.getActiveLookup(fixture.editor)?.items?.isNotEmpty() == true },
+                5,
+            )
+        }
+
+        val lookup = LookupManager.getActiveLookup(fixture.editor)
+        assertNotNull(lookup)
+        assertTrue(
+            lookup!!.items.any { it.`object` is PsiField || it.`object` is PsiMethod },
+            "Completion variants: ${lookup.items.map { it.lookupString }}",
+        )
     }
 
     @Test
