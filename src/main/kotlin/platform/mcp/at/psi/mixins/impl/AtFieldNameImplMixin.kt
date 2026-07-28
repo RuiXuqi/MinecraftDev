@@ -3,7 +3,7 @@
  *
  * https://mcdev.io/
  *
- * Copyright (C) 2025 minecraft-dev
+ * Copyright (C) 2026 minecraft-dev
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published
@@ -21,11 +21,15 @@
 package com.demonwav.mcdev.platform.mcp.at.psi.mixins.impl
 
 import com.demonwav.mcdev.platform.mcp.at.AtElementFactory
+import com.demonwav.mcdev.platform.mcp.at.AtSymbolReference
 import com.demonwav.mcdev.platform.mcp.at.psi.mixins.AtFieldNameMixin
 import com.intellij.extapi.psi.ASTWrapperPsiElement
 import com.intellij.lang.ASTNode
+import com.intellij.psi.PsiReference
 
 abstract class AtFieldNameImplMixin(node: ASTNode) : ASTWrapperPsiElement(node), AtFieldNameMixin {
+
+    override fun getReference(): PsiReference = AtSymbolReference(this)
 
     override fun setFieldName(fieldName: String) {
         replace(AtElementFactory.createFieldName(project, fieldName))
