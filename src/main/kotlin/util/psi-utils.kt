@@ -35,6 +35,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.LibraryOrderEntry
 import com.intellij.openapi.roots.ModuleRootManager
 import com.intellij.openapi.roots.ProjectFileIndex
+import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.roots.impl.OrderEntryUtil
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.UserDataHolderEx
@@ -336,7 +337,7 @@ inline fun <T> PsiElement.lockedCached(
     }
 }
 
-fun PsiElement.findMcpModule() = this.cached {
+fun PsiElement.findMcpModule() = this.cached(ProjectRootManager.getInstance(project)) {
     val file = containingFile?.viewProvider?.virtualFile ?: return@cached null
     val index = ProjectFileIndex.getInstance(project)
     val modules = if (index.isInLibrary(file)) {
@@ -363,7 +364,7 @@ private fun Module.findMcpModule(): McpModule? {
 }
 
 val PsiElement.mcVersion: SemanticVersion?
-    get() = this.cached {
+    get() = this.cached(ProjectRootManager.getInstance(project)) {
         findMcpModule()?.let {
             SemanticVersion.tryParse(it.getSettings().minecraftVersion ?: return@let null)
         }

@@ -25,6 +25,7 @@ import com.demonwav.mcdev.util.getDataFromActionEvent
 import com.demonwav.mcdev.util.internalName
 import com.demonwav.mcdev.util.showBalloon
 import com.demonwav.mcdev.util.showSuccessBalloon
+import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.editor.Editor
@@ -39,6 +40,8 @@ import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
 
 class CopyAwAction : AnAction() {
+
+    override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
     override fun actionPerformed(e: AnActionEvent) {
         val data = getDataFromActionEvent(e) ?: return showBalloon(e, "Unknown failure")

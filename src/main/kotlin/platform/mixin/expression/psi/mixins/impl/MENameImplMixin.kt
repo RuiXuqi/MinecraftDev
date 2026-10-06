@@ -32,10 +32,13 @@ abstract class MENameImplMixin(node: ASTNode) : ASTWrapperPsiElement(node), MENa
     override val isWildcard get() = node.firstChildNode.elementType == MEExpressionTypes.TOKEN_WILDCARD
     override val identifierElement get() = if (isWildcard) null else firstChild
 
-    override fun getReference(): PsiReference? {
+    private val cachedRef: PsiReference? by lazy {
         if (isWildcard) {
-            return null
+            null
+        } else {
+            MEDefinitionReference(this as MEName)
         }
-        return MEDefinitionReference(this as MEName)
     }
+
+    override fun getReference(): PsiReference? = cachedRef
 }

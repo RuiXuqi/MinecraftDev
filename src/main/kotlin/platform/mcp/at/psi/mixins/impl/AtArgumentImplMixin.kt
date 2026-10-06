@@ -34,7 +34,9 @@ abstract class AtArgumentImplMixin(node: ASTNode) : ASTWrapperPsiElement(node), 
     override val argumentClass: PsiClass?
         get() = AtSymbolResolver.resolve(this) as? PsiClass
 
-    override fun getReference(): PsiReference = AtSymbolReference(this)
+    private val cachedRef: PsiReference by lazy { AtSymbolReference(this) }
+
+    override fun getReference(): PsiReference = cachedRef
 
     override val argumentText: String
         get() = classValue?.text ?: primitive!!.text

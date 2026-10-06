@@ -90,7 +90,6 @@ class MEExpressionCompletionTest : BaseMixinTest() {
         MinecraftProjectSettings.getInstance(fixture.project).definitionPosRelativeToExpression = BeforeOrAfter.BEFORE
 
         try {
-            MEExpressionCompletionUtil.debugCompletionUnitTest = true
             val possibleItems = fixture.completeBasic()
             if (possibleItems != null) {
                 val itemToComplete = possibleItems.firstOrNull { it.lookupString == lookupString }
@@ -107,7 +106,7 @@ class MEExpressionCompletionTest : BaseMixinTest() {
                 return
             }
         } finally {
-            MEExpressionCompletionUtil.debugCompletionUnitTest = false
+            // nothing to reset
         }
 
         // TODO: this is for debugging, remove this once we figure out why tests are failing

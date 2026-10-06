@@ -32,11 +32,10 @@ import com.demonwav.mcdev.util.SourceType
 import com.demonwav.mcdev.util.nullable
 import com.demonwav.mcdev.util.runCatchingKtIdeaExceptions
 import com.demonwav.mcdev.util.runWriteTaskLater
-import com.demonwav.mcdev.util.waitForAllSmart
 import com.intellij.json.JsonFileType
 import com.intellij.lang.jvm.JvmModifier
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.fileTypes.FileTypeManager
+import com.intellij.openapi.project.DumbService
 import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiMethod
@@ -61,8 +60,11 @@ class NeoForgeModule internal constructor(facet: MinecraftFacet) : AbstractModul
     override val eventListenerGenSupport: EventListenerGenerationSupport = NeoForgeEventListenerGenerationSupport()
 
     override fun init() {
-        ApplicationManager.getApplication().executeOnPooledThread {
-            waitForAllSmart()
+        DumbService.getInstance(project).runWhenSmart {
+            if (project.isDisposed) {
+                return@runWhenSmart
+            }
+
             // Set mcmod.info icon
             runWriteTaskLater {
                 FileTypeManager.getInstance().associatePattern(JsonFileType.INSTANCE, NeoForgeConstants.MCMOD_INFO)

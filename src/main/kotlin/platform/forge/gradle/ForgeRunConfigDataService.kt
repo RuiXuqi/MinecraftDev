@@ -23,7 +23,6 @@ package com.demonwav.mcdev.platform.forge.gradle
 import com.demonwav.mcdev.platform.forge.ForgeModuleType
 import com.demonwav.mcdev.platform.forge.creator.MAGIC_RUN_CONFIGS_FILE
 import com.demonwav.mcdev.util.SemanticVersion
-import com.demonwav.mcdev.util.invokeAndWait
 import com.demonwav.mcdev.util.invokeLater
 import com.demonwav.mcdev.util.localFile
 import com.demonwav.mcdev.util.runGradleTaskAndWait
@@ -170,15 +169,11 @@ class ForgeRunConfigDataService : AbstractProjectDataService<ProjectData, Projec
     }
 
     private fun cleanupGeneratedRuns(project: Project, module: Module, hasData: Boolean) {
-        invokeAndWait {
-            if (!module.isDisposed) {
-                ForgeRunManagerListener(module, hasData)
-            }
-        }
-
-        if (project.isDisposed) {
+        if (project.isDisposed || module.isDisposed) {
             return
         }
+
+        ForgeRunManagerListener(module, hasData)
 
         project.guessProjectDir()?.let { dir ->
             LocalFileSystem.getInstance().refreshFiles(listOf(dir), true, true, null)
@@ -192,7 +187,7 @@ class ForgeRunConfigDataService : AbstractProjectDataService<ProjectData, Projec
 
 class ForgeRunManagerListener(private val module: Module, hasData: Boolean) : RunManagerListener {
     private val count = AtomicInteger(3)
-    private val disposable = Disposer.newDisposable()
+    private val disposable = Disposer.newDisposable(module, "ForgeRunManagerListener")
 
     init {
         module.project.messageBus.connect(disposable).subscribe(RunManagerListener.TOPIC, this)

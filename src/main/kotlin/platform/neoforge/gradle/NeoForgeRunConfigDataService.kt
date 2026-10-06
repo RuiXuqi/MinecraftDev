@@ -21,7 +21,6 @@
 package com.demonwav.mcdev.platform.neoforge.gradle
 
 import com.demonwav.mcdev.platform.neoforge.creator.MAGIC_RUN_CONFIGS_FILE
-import com.demonwav.mcdev.util.invokeAndWait
 import com.demonwav.mcdev.util.localFile
 import com.demonwav.mcdev.util.runGradleTaskAndWait
 import com.intellij.execution.RunManager
@@ -110,11 +109,11 @@ class NeoForgeRunConfigDataService : AbstractProjectDataService<ProjectData, Pro
     }
 
     private fun cleanupGeneratedRuns(project: Project, module: Module) {
-        invokeAndWait {
-            if (!module.isDisposed) {
-                NeoForgeRunManagerListener(module, true)
-            }
+        if (project.isDisposed || module.isDisposed) {
+            return
         }
+
+        NeoForgeRunManagerListener(module, true)
 
         project.guessProjectDir()?.let { dir ->
             LocalFileSystem.getInstance().refreshFiles(listOf(dir), true, true, null)
@@ -128,7 +127,7 @@ class NeoForgeRunConfigDataService : AbstractProjectDataService<ProjectData, Pro
 
 class NeoForgeRunManagerListener(private val module: Module, hasData: Boolean) : RunManagerListener {
     private val count = AtomicInteger(3)
-    private val disposable = Disposer.newDisposable()
+    private val disposable = Disposer.newDisposable(module, "NeoForgeRunManagerListener")
 
     init {
         module.project.messageBus.connect(disposable).subscribe(RunManagerListener.TOPIC, this)

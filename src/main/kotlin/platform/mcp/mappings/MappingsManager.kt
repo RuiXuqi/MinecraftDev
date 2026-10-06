@@ -28,6 +28,7 @@ import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.project.Project
 import java.nio.file.Files
 import java.nio.file.Paths
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
@@ -54,10 +55,11 @@ abstract class MappingsManager {
     abstract fun parse()
 
     companion object {
-        private val map = HashMap<String, MappingsManager>()
+        private val map = ConcurrentHashMap<Pair<String, SrgType>, MappingsManager>()
 
         @Deprecated("This needs replacing with something that doesn't cause memory leaks")
-        fun getInstance(file: String, srgType: SrgType) = map.computeIfAbsent(file) { SrgMappingsManager(it, srgType) }
+        fun getInstance(file: String, srgType: SrgType) =
+            map.computeIfAbsent(file to srgType) { (f, t) -> SrgMappingsManager(f, t) }
 
         fun findAnyInstance(project: Project) =
             ModuleManager.getInstance(project).modules.mapFirstNotNull {

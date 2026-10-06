@@ -27,6 +27,7 @@ import com.demonwav.mcdev.util.findReferencedClass
 import com.demonwav.mcdev.util.fullQualifiedName
 import com.demonwav.mcdev.util.invokeLater
 import com.intellij.codeInsight.navigation.getPsiElementPopup
+import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys.CARET
@@ -119,6 +120,8 @@ class FindMixinsAction : AnAction() {
             }
         }
     }
+
+    override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.getData(PROJECT) ?: return

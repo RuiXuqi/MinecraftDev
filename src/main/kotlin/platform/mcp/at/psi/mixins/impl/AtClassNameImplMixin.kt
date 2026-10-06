@@ -34,7 +34,9 @@ abstract class AtClassNameImplMixin(node: ASTNode) : ASTWrapperPsiElement(node),
     override val classNameValue: PsiClass?
         get() = AtSymbolResolver.resolve(this) as? PsiClass
 
-    override fun getReference(): PsiReference = AtSymbolReference(this)
+    private val cachedRef: PsiReference by lazy { AtSymbolReference(this) }
+
+    override fun getReference(): PsiReference = cachedRef
 
     override val classNameText: String
         get() = classNameElement.text

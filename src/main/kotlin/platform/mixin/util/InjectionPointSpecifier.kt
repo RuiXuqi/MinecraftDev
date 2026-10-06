@@ -23,9 +23,12 @@ package com.demonwav.mcdev.platform.mixin.util
 import com.demonwav.mcdev.platform.mixin.util.MixinConstants.Annotations.SLICE
 import com.demonwav.mcdev.platform.mixin.util.MixinConstants.Classes.SPECIFIER
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.psi.JavaPsiFacade
 import com.intellij.psi.PsiAnnotation
 import com.intellij.psi.search.GlobalSearchScope
+import com.intellij.psi.util.CachedValueProvider
+import com.intellij.psi.util.CachedValuesManager
 import com.intellij.psi.util.parentOfType
 
 enum class InjectionPointSpecifier {
@@ -41,8 +44,10 @@ enum class InjectionPointSpecifier {
         }
 
         private fun isAllowedOutsideSlice(project: Project): Boolean =
-            (JavaPsiFacade.getInstance(project)
-                .findClass(SPECIFIER, GlobalSearchScope.allScope(project))
-                != null)
+            CachedValuesManager.getManager(project).getCachedValue(project) {
+                val result = JavaPsiFacade.getInstance(project)
+                    .findClass(SPECIFIER, GlobalSearchScope.allScope(project)) != null
+                CachedValueProvider.Result.create(result, ProjectRootManager.getInstance(project))
+            }
     }
 }

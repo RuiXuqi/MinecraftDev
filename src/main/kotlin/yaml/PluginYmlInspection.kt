@@ -53,10 +53,19 @@ class PluginYmlInspection : LocalInspectionTool() {
             else -> return PsiElementVisitor.EMPTY_VISITOR
         }
 
-        return Visitor(holder, pluginClassFqn)
+        // Resolve the plugin interface once per file instead of per scalar
+        val pluginClass = JavaPsiFacade.getInstance(holder.project)
+            .findClass(pluginClassFqn, module.getModuleWithDependenciesAndLibrariesScope(false))
+            ?: return PsiElementVisitor.EMPTY_VISITOR
+
+        return Visitor(holder, pluginClassFqn, pluginClass)
     }
 
-    private class Visitor(val holder: ProblemsHolder, val pluginClassFqn: String) : YamlPsiElementVisitor() {
+    private class Visitor(
+        val holder: ProblemsHolder,
+        val pluginClassFqn: String,
+        val pluginClass: PsiClass,
+    ) : YamlPsiElementVisitor() {
 
         override fun visitScalar(scalar: YAMLScalar) {
             super.visitScalar(scalar)
@@ -71,8 +80,6 @@ class PluginYmlInspection : LocalInspectionTool() {
                 return
             }
 
-            val pluginClass = JavaPsiFacade.getInstance(holder.project).findClass(pluginClassFqn, scalar.resolveScope)
-                ?: return
             if (!resolved.isInheritor(pluginClass, true)) {
                 holder.registerProblem(scalar, "Class must implement $pluginClassFqn")
             }

@@ -42,6 +42,8 @@ import com.intellij.ui.dsl.builder.panel
 import com.intellij.util.ui.AsyncProcessIcon
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.swing.Swing
 
@@ -73,13 +75,16 @@ abstract class AbstractLatentStep<T>(parent: NewProjectWizardStep) : AbstractNew
         }
         hasComputedData = true
 
+        val scope = CoroutineScope(Dispatchers.Swing + SupervisorJob())
+
         var disposed = false
         Disposer.register(lifetime) {
             hasComputedData = false
             disposed = true
+            scope.cancel()
         }
 
-        CoroutineScope(Dispatchers.Swing).launch {
+        scope.launch {
             if (disposed) {
                 return@launch
             }

@@ -50,11 +50,8 @@ class PluginLineMarkerProvider : LineMarkerProviderDescriptor() {
             return null
         }
 
-        val a11yText = if (!ScreenReader.isActive()) {
-            // if screenreader isn't active, don't need to spend the extra time building the string
-            val name = MCDevBundle("insight.plugin.marker.accessible_name_plugin")
-            MCDevBundle("insight.plugin.marker.accessible_name", name)
-        } else {
+        val a11yText = if (ScreenReader.isActive()) {
+            // Only compute the detailed mod/plugin text when a screen reader is actually active
             val isMod = instance.modules.asSequence()
                 .filter { it.shouldShowPluginIcon(element) }
                 .map {
@@ -85,6 +82,10 @@ class PluginLineMarkerProvider : LineMarkerProviderDescriptor() {
                 ThreeState.UNSURE -> MCDevBundle("insight.plugin.marker.accessible_name_unsure")
             }
 
+            MCDevBundle("insight.plugin.marker.accessible_name", name)
+        } else {
+            // No screen reader active, don't spend the extra time building the detailed string
+            val name = MCDevBundle("insight.plugin.marker.accessible_name_plugin")
             MCDevBundle("insight.plugin.marker.accessible_name", name)
         }
 

@@ -35,12 +35,12 @@ import com.demonwav.mcdev.util.SourceType
 import com.demonwav.mcdev.util.nullable
 import com.demonwav.mcdev.util.runCatchingKtIdeaExceptions
 import com.demonwav.mcdev.util.runWriteTaskLater
-import com.demonwav.mcdev.util.waitForAllSmart
 import com.intellij.json.JsonFileType
 import com.intellij.lang.jvm.JvmModifier
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.fileTypes.FileTypeManager
+import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.JavaPsiFacade
@@ -76,16 +76,15 @@ class ForgeModule internal constructor(facet: MinecraftFacet) : AbstractModule(f
     override val eventListenerGenSupport: EventListenerGenerationSupport = ForgeEventListenerGenerationSupport()
 
     override fun init() {
-        ApplicationManager.getApplication().executeOnPooledThread {
-            waitForAllSmart()
+        DumbService.getInstance(project).runWhenSmart {
+            if (project.isDisposed) {
+                return@runWhenSmart
+            }
+
             // Set mcmod.info icon
             runWriteTaskLater {
                 FileTypeManager.getInstance().associatePattern(JsonFileType.INSTANCE, ForgeConstants.MCMOD_INFO)
                 FileTypeManager.getInstance().associatePattern(JsonFileType.INSTANCE, ForgeConstants.PACK_MCMETA)
-            }
-
-            if (project.isDisposed) {
-                return@executeOnPooledThread
             }
 
             // Index @SideOnly

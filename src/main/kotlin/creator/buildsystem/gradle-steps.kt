@@ -56,7 +56,10 @@ import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiManager
 import java.nio.file.Path
 import java.util.concurrent.CountDownLatch
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import org.jetbrains.plugins.gradle.service.execution.GradleExternalTaskConfigurationType
 import org.jetbrains.plugins.gradle.service.execution.GradleRunConfiguration
 import org.jetbrains.plugins.gradle.service.project.open.canLinkAndRefreshGradleProject
@@ -217,10 +220,13 @@ open class GradleImportStep(parent: NewProjectWizardStep) : AbstractLongRunningS
         invokeLater(project.disposed) {
             val path = rootDirectory.toAbsolutePath().toString()
             if (canLinkAndRefreshGradleProject(path, project, false)) {
-                runBlocking {
+                val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+                scope.launch {
                     linkAndSyncGradleProject(project, path)
+                    invokeLater(project.disposed) {
+                        showProgress(project)
+                    }
                 }
-                showProgress(project)
             }
 
             StartupManager.getInstance(project).runAfterOpened {
