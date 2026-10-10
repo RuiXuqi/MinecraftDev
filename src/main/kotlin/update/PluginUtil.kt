@@ -25,7 +25,7 @@ import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.openapi.extensions.PluginId
 
 object PluginUtil {
-    val PLUGIN_ID = PluginId.getId("com.demonwav.minecraft-dev")
+    val PLUGIN_ID = PluginId.getId("io.github.ruixuqi.minecraft-dev")
 
     val plugin: IdeaPluginDescriptor
         get() {
