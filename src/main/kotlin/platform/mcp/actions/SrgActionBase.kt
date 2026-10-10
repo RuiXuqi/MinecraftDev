@@ -21,6 +21,7 @@
 package com.demonwav.mcdev.platform.mcp.actions
 
 import com.demonwav.mcdev.platform.mcp.McpModuleType
+import com.demonwav.mcdev.platform.mcp.McpModule
 import com.demonwav.mcdev.platform.mcp.mappings.Mappings
 import com.demonwav.mcdev.platform.mixin.handlers.ShadowHandler
 import com.demonwav.mcdev.util.ActionData
@@ -44,6 +45,10 @@ abstract class SrgActionBase : AnAction() {
         }
 
         val mcpModule = data.instance.getModuleOfType(McpModuleType)
+
+        if (!requiresSrgMappings(mcpModule)) {
+            return performWithMappings(e, data, data.element, null)
+        }
 
         val mappingsManager = mcpModule?.mappingsManager ?: return performWithMappings(e, data, data.element, null)
         mappingsManager.mappings.onSuccess { srgMap ->
@@ -74,6 +79,8 @@ abstract class SrgActionBase : AnAction() {
 
         withSrgTarget(parent, srgMap, e, data)
     }
+
+    protected open fun requiresSrgMappings(mcpModule: McpModule?) = true
 
     abstract fun withSrgTarget(parent: PsiElement, srgMap: Mappings?, e: AnActionEvent, data: ActionData)
 }

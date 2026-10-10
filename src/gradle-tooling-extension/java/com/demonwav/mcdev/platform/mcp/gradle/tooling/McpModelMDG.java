@@ -3,7 +3,7 @@
  *
  * https://mcdev.io/
  *
- * Copyright (C) 2025 minecraft-dev
+ * Copyright (C) 2026 minecraft-dev
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published
@@ -18,15 +18,25 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package com.demonwav.mcdev.platform.mcp.at.completion
+package com.demonwav.mcdev.platform.mcp.gradle.tooling;
 
-import com.intellij.codeInsight.completion.PrefixMatcher
-import com.intellij.codeInsight.lookup.LookupElement
+import java.io.File;
+import java.util.List;
 
-class KindPrefixMatcher(prefix: String) : PrefixMatcher(prefix) {
-    override fun prefixMatches(name: String) = true
-    override fun cloneWithPrefix(prefix: String) = KindPrefixMatcher(prefix)
+import org.jetbrains.annotations.Nullable;
 
-    override fun prefixMatches(element: LookupElement) =
-        element.lookupString.contains(prefix, ignoreCase = true)
+/**
+ * Model for ModDevGradle's MCPForge plugin ({@code net.neoforged.moddev.mcpforge}), the MCP-based
+ * legacy Forge/Cleanroom toolchain for Minecraft 1.12.2 and other legacy versions.
+ */
+public interface McpModelMDG {
+    @Nullable String getMinecraftVersion();
+
+    @Nullable String getPlatformVersion();
+
+    @Nullable String getMcpVersion();
+
+    @Nullable File getMappingsFile();
+
+    List<File> getAccessTransformers();
 }

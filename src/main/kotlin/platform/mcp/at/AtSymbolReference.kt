@@ -3,7 +3,7 @@
  *
  * https://mcdev.io/
  *
- * Copyright (C) 2025 minecraft-dev
+ * Copyright (C) 2026 minecraft-dev
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published
@@ -18,16 +18,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package com.demonwav.mcdev.platform.mcp.at.completion
+package com.demonwav.mcdev.platform.mcp.at
 
-import com.intellij.codeInsight.completion.PrefixMatcher
-import com.intellij.codeInsight.lookup.LookupElement
+import com.demonwav.mcdev.platform.mcp.at.psi.AtElement
+import com.intellij.openapi.util.TextRange
+import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiReferenceBase
 
-class SrgPrefixMatcher(prefix: String) : PrefixMatcher(prefix) {
-    override fun prefixMatches(name: String) = true
-    override fun cloneWithPrefix(prefix: String) = SrgPrefixMatcher(prefix)
+class AtSymbolReference(element: AtElement) :
+    PsiReferenceBase<AtElement>(element, TextRange(0, element.textLength), false) {
 
-    override fun prefixMatches(element: LookupElement): Boolean {
-        return element.lookupString.contains(myPrefix, ignoreCase = true)
-    }
+    override fun resolve(): PsiElement? = AtSymbolResolver.resolve(element)
 }
