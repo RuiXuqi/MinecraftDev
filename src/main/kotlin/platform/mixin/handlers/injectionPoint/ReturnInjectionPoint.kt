@@ -43,6 +43,8 @@ import org.objectweb.asm.tree.ClassNode
 import org.objectweb.asm.tree.MethodNode
 
 abstract class AbstractReturnInjectionPoint(private val tailOnly: Boolean) : InjectionPoint<PsiElement>() {
+    override val hasSemanticKey: Boolean get() = false
+
     override fun createNavigationVisitor(
         at: PsiAnnotation,
         target: MixinSelector?,

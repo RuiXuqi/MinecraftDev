@@ -76,6 +76,13 @@ abstract class InjectionPoint<T : PsiElement> {
         }
     }
 
+    /**
+     * Whether this injection point has a semantic key (e.g. a member reference) that can be used
+     * to match bytecode results against source elements semantically, rather than purely by line number.
+     * Positional injection points such as HEAD, RETURN, TAIL and CTOR_HEAD have no such key.
+     */
+    open val hasSemanticKey: Boolean get() = true
+
     open fun usesMemberReference() = false
 
     open fun onCompleted(editor: Editor, reference: PsiLiteral) {

@@ -55,7 +55,10 @@ import com.intellij.psi.PsiClassType
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiEnumConstant
 import com.intellij.psi.PsiExpression
+import com.intellij.psi.PsiFile
+import com.intellij.psi.PsiMethodCallExpression
 import com.intellij.psi.PsiModifier
+import com.intellij.psi.PsiNewExpression
 import com.intellij.psi.PsiParameterListOwner
 import com.intellij.psi.PsiQualifiedReference
 import com.intellij.psi.PsiReference
@@ -283,13 +286,72 @@ class AtResolver(
         // Map the desugared results back into the original source class
         val sourceResults = navigationVisitor.result.mapNotNull(DesugarUtil::getOriginalElement)
 
+        val bytecodeResultsList = bytecodeResults.toList()
+
         // Match the bytecode results to the source results
+        val mapped = matchByLineNumber(bytecodeResultsList, sourceResults, targetPsiFile)
+        if (mapped.isNotEmpty()) {
+            return mapped
+        }
+
+        // Line-number matching failed entirely. For injection points with a semantic key, the source
+        // results have already been filtered semantically by the navigation visitor, so prefer ordinal
+        // pairing over pure line numbers. For positional injection points, or when there is nothing to
+        // pair with, fall back to the target method itself.
+        if (injectionPoint.hasSemanticKey && target != null && sourceResults.isNotEmpty()) {
+            return matchSemantically(bytecodeResultsList, sourceResults)
+                .ifEmpty { listOfNotNull(originalTargetElement(desugaredTargetElement)) }
+        }
+        return listOfNotNull(originalTargetElement(desugaredTargetElement))
+    }
+
+    private fun originalTargetElement(desugaredTargetElement: PsiElement): PsiElement? {
+        return DesugarUtil.getOriginalElement(desugaredTargetElement) ?: desugaredTargetElement
+    }
+
+    private fun matchByLineNumber(
+        bytecodeResults: List<CollectVisitor.Result<*>>,
+        sourceResults: List<PsiElement>,
+        targetPsiFile: PsiFile,
+    ): List<PsiElement> {
         return bytecodeResults.mapNotNull { bytecodeResult ->
             val matcher = bytecodeResult.sourceLocationInfo.createMatcher<PsiElement>(targetPsiFile)
             sourceResults.forEach(matcher::accept)
             matcher.result
         }
-            .toList()
+    }
+
+    /**
+     * Pairs bytecode results with source results by semantic identity and ordinal, rather than by line
+     * number. Each bytecode result is matched, in occurrence order, with the first not-yet-matched source
+     * result that resolves to the same member. Source results are already filtered by the navigation
+     * visitor's selector, so this mainly guards against desugaring drift and provides ordinal stability.
+     */
+    private fun matchSemantically(
+        bytecodeResults: List<CollectVisitor.Result<*>>,
+        sourceResults: List<PsiElement>,
+    ): List<PsiElement> {
+        val used = BooleanArray(sourceResults.size)
+        return bytecodeResults.mapNotNull { bytecodeResult ->
+            val member = bytecodeResult.target
+            val candidates = sourceResults.indices.filter { i ->
+                !used[i] && sourceElementMatchesMember(sourceResults[i], member)
+            }
+            val chosen = candidates.firstOrNull() ?: return@mapNotNull null
+            used[chosen] = true
+            sourceResults[chosen]
+        }
+    }
+
+    private fun sourceElementMatchesMember(source: PsiElement, member: Any?): Boolean {
+        if (member !is PsiElement) return true
+        val referenced = when (source) {
+            is PsiMethodCallExpression -> source.resolveMethod()
+            is PsiNewExpression -> source.resolveConstructor()
+            is PsiReferenceExpression -> source.resolve()
+            else -> null
+        } ?: return true
+        return referenced.manager.areElementsEquivalent(referenced, member)
     }
 
     fun collectTargetVariants(completionHandler: (LookupElementBuilder) -> LookupElementBuilder): List<Any> {
