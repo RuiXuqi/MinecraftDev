@@ -24,8 +24,9 @@ import com.demonwav.mcdev.platform.forge.inspections.sideonly.Side
 import com.demonwav.mcdev.platform.forge.inspections.sideonly.SideOnlyUtil
 import com.demonwav.mcdev.util.findModule
 import com.demonwav.mcdev.util.runGradleTaskWithCallback
-import com.demonwav.mcdev.util.runWriteActionAndWait
 import com.intellij.codeInsight.AttachSourcesProvider
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.externalSystem.task.TaskCallback
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.LibraryOrderEntry
@@ -140,13 +141,15 @@ class FabricLoomDecompileSourceProvider : AttachSourcesProvider {
         }
 
         private fun attachSources(libraryEntries: List<LibraryOrderEntry>, sourcePath: String): ActionCallback {
-            // Distinct because for some reason the same library is in there twice
-            for (libraryEntry in libraryEntries.distinctBy { it.libraryName }) {
-                val library = libraryEntry.library
-                if (library != null) {
-                    runWriteActionAndWait {
+            val callback = ActionCallback()
+            // The Gradle TaskCallback may arrive on any thread; write actions must run on EDT
+            ApplicationManager.getApplication().invokeLater {
+                WriteAction.run<Throwable> {
+                    // Distinct because for some reason the same library is in there twice
+                    for (libraryEntry in libraryEntries.distinctBy { it.libraryName }) {
+                        val library = libraryEntry.library ?: continue
                         if (library is LibraryEx && library.isDisposed) {
-                            return@runWriteActionAndWait
+                            continue
                         }
 
                         val model = library.modifiableModel
@@ -154,26 +157,30 @@ class FabricLoomDecompileSourceProvider : AttachSourcesProvider {
                         model.commit()
                     }
                 }
+                callback.setDone()
             }
-
-            return ActionCallback.DONE
+            return callback
         }
 
         private fun attachSources(project: Project, libraryEntities: Collection<LibraryEntity>, sourcePath: String): ActionCallback {
-            runWriteActionAndWait {
-                val model = WorkspaceModel.getInstance(project)
-                model.updateProjectModel("Attaching sources") { storage ->
-                    for (libraryEntity in libraryEntities.distinctBy { it.name }) {
-                        storage.modifyLibraryEntity(libraryEntity) {
-                            roots += LibraryRoot(
-                                model.getVirtualFileUrlManager().getOrCreateFromUrl("jar://$sourcePath!/"),
-                                LibraryRootTypeId.SOURCES
-                            )
+            val callback = ActionCallback()
+            ApplicationManager.getApplication().invokeLater {
+                WriteAction.run<Throwable> {
+                    val model = WorkspaceModel.getInstance(project)
+                    model.updateProjectModel("Attaching sources") { storage ->
+                        for (libraryEntity in libraryEntities.distinctBy { it.name }) {
+                            storage.modifyLibraryEntity(libraryEntity) {
+                                roots += LibraryRoot(
+                                    model.getVirtualFileUrlManager().getOrCreateFromUrl("jar://$sourcePath!/"),
+                                    LibraryRootTypeId.SOURCES
+                                )
+                            }
                         }
                     }
                 }
+                callback.setDone()
             }
-            return ActionCallback.DONE
+            return callback
         }
     }
 }

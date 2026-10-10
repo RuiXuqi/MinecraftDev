@@ -32,7 +32,6 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.roots.libraries.LibraryKind
 import com.intellij.openapi.roots.libraries.LibraryKindRegistry
 import com.intellij.openapi.util.Computable
@@ -123,14 +122,6 @@ inline fun <T> PsiFile.applyWriteAction(crossinline func: PsiFile.() -> T): T {
 fun <T> runReadActionAsync(runnable: () -> T): Promise<T> {
     return runAsync {
         runReadActionBlocking(runnable)
-    }
-}
-
-fun waitForAllSmart() {
-    for (project in ProjectManager.getInstance().openProjects) {
-        if (!project.isDisposed) {
-            DumbService.getInstance(project).waitForSmartMode()
-        }
     }
 }
 

@@ -30,6 +30,7 @@ import com.demonwav.mcdev.util.gotoTargetElement
 import com.demonwav.mcdev.util.qualifiedMemberReference
 import com.demonwav.mcdev.util.showBalloon
 import com.demonwav.mcdev.util.simpleQualifiedMemberReference
+import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.module.ModuleManager
@@ -43,6 +44,8 @@ import com.intellij.psi.search.PsiSearchHelper
 import com.intellij.psi.search.UsageSearchContext
 
 class GotoAtEntryAction : AnAction() {
+    override fun getActionUpdateThread() = ActionUpdateThread.BGT
+
     override fun actionPerformed(e: AnActionEvent) {
         val data = getDataFromActionEvent(e) ?: return showBalloon(e)
 

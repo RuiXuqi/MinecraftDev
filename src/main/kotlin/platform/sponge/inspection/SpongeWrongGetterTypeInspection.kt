@@ -39,11 +39,13 @@ import com.intellij.openapi.project.Project
 import com.intellij.psi.JavaPsiFacade
 import com.intellij.psi.PsiClassType
 import com.intellij.psi.PsiFile
+import com.intellij.psi.PsiMethod
 import com.intellij.psi.PsiPrimitiveType
 import com.intellij.psi.PsiSubstitutor
 import com.intellij.psi.PsiType
+import com.intellij.psi.SmartPointerManager
+import com.intellij.psi.SmartPsiElementPointer
 import com.intellij.psi.util.TypeConversionUtil
-import java.util.function.Supplier
 import org.jetbrains.uast.UMethod
 import org.jetbrains.uast.getContainingUClass
 
@@ -175,10 +177,16 @@ class SpongeWrongGetterTypeInspection : AbstractBaseUastLocalInspectionTool() {
     ) : IntentionAndQuickFixAction() {
 
         private val myText: String = "Set parameter type to ${expectedType.presentableText}"
-        private val methodPointer = Supplier<JvmMethod?> { method }
+        private val methodPointer: SmartPsiElementPointer<PsiMethod>? =
+            (method.sourceElement as? PsiMethod)?.let { SmartPointerManager.createPointer(it) }
 
         override fun applyFix(project: Project, file: PsiFile, editor: Editor?) {
-            val changeParamsRequest = updateMethodParametersRequest(methodPointer) { actualParams ->
+            val psiMethod = methodPointer?.element ?: return
+            if (psiMethod.parameters.size <= paramIndex) {
+                return
+            }
+            val methodSupplier = java.util.function.Supplier<JvmMethod?> { psiMethod }
+            val changeParamsRequest = updateMethodParametersRequest(methodSupplier) { actualParams ->
                 val existingParam = actualParams[paramIndex]
                 val newParam = expectedParameter(
                     expectedType,
@@ -187,7 +195,7 @@ class SpongeWrongGetterTypeInspection : AbstractBaseUastLocalInspectionTool() {
                 )
                 actualParams.toMutableList().also { it[paramIndex] = newParam }
             }
-            val waw = createChangeParametersActions(methodPointer.get()!!, changeParamsRequest).firstOrNull() ?: return
+            val waw = createChangeParametersActions(psiMethod, changeParamsRequest).firstOrNull() ?: return
             waw.invoke(project, editor, file)
         }
 

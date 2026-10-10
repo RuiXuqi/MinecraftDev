@@ -27,10 +27,13 @@ import org.intellij.lang.annotations.Language
 
 object ModsTomlSchema {
 
+    @Volatile
     private var cached: TomlSchema? = null
 
     fun get(project: Project): TomlSchema {
-        return cached ?: TomlSchema.parse(project, EXAMPLE_MODS_TOML).also { cached = it }
+        return cached ?: synchronized(this) {
+            cached ?: TomlSchema.parse(project, EXAMPLE_MODS_TOML).also { cached = it }
+        }
     }
 }
 

@@ -34,7 +34,6 @@ import com.intellij.openapi.application.ex.ApplicationInfoEx
 import com.intellij.openapi.diagnostic.ErrorReportSubmitter
 import com.intellij.openapi.diagnostic.IdeaLoggingEvent
 import com.intellij.openapi.diagnostic.SubmittedReportInfo
-import com.intellij.openapi.progress.EmptyProgressIndicator
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
@@ -76,7 +75,7 @@ class ErrorReporter : ErrorReportSubmitter() {
                 }
             }
             if (project == null) {
-                task.run(EmptyProgressIndicator())
+                task.queue()
             } else {
                 ProgressManager.getInstance().run(task)
             }
@@ -96,10 +95,12 @@ class ErrorReporter : ErrorReportSubmitter() {
         }
 
         PluginManagerCore.getPlugin(PluginUtil.PLUGIN_ID)?.let { plugin ->
-            val (ideaVersion, coreVersion) = plugin.version.split('-', limit = 2)
+            val versionParts = plugin.version.split('-', limit = 2)
             sentryEvent.release = plugin.version
-            sentryEvent.setTag("idea_version", ideaVersion)
-            sentryEvent.setTag("core_version", coreVersion)
+            sentryEvent.setTag("idea_version", versionParts[0])
+            if (versionParts.size > 1) {
+                sentryEvent.setTag("core_version", versionParts[1])
+            }
         }
 
         val appInfo = ApplicationInfoEx.getInstanceEx()
@@ -155,7 +156,7 @@ class ErrorReporter : ErrorReportSubmitter() {
         }
 
         if (project == null) {
-            task.run(EmptyProgressIndicator())
+            task.queue()
         } else {
             ProgressManager.getInstance().run(task)
         }

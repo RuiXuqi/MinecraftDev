@@ -51,9 +51,11 @@ class TranslationGotoModel(project: Project, private val prefix: String, private
         canceled: ProgressIndicator,
     ): Array<Any> {
         val superResult = super.getElementsByName(name, parameters, canceled).asSequence()
-        val result = TreeSet<PsiNamedElement> { o1, o2 ->
-            (o1 as PsiNamedElement).name?.compareTo((o2 as PsiNamedElement).name ?: return@TreeSet -1) ?: -1
-        }
+        // Total-order comparator: sort by name, then disambiguate duplicates by file so
+        // same-named translations from different files are not silently dropped by TreeSet
+        val result = TreeSet<PsiNamedElement>(
+            compareBy<PsiNamedElement>({ it.name ?: "" }, { it.containingFile?.virtualFile?.path ?: "" }),
+        )
         result.addAll(
             superResult.map { it as PsiNamedElement }.filter {
                 val key = it.name ?: return@filter false

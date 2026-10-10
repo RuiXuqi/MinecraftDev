@@ -166,17 +166,24 @@ class MinecraftFacetDetector : ProjectActivity {
         private fun checkExistingFacet(module: Module, facet: MinecraftFacet) {
             val platforms = autoDetectTypes(module).ifEmpty { return }
 
-            val types = facet.configuration.state.autoDetectTypes
-            types.clear()
-            types.addAll(platforms)
+            runWriteTaskLater {
+                if (module.isDisposed) {
+                    // Module may be disposed before we run
+                    return@runWriteTaskLater
+                }
 
-            if (facet.configuration.state.forgePatcher) {
-                // make sure Forge and MCP are present
-                types.add(PlatformType.FORGE)
-                types.add(PlatformType.MCP)
+                val types = facet.configuration.state.autoDetectTypes
+                types.clear()
+                types.addAll(platforms)
+
+                if (facet.configuration.state.forgePatcher) {
+                    // make sure Forge and MCP are present
+                    types.add(PlatformType.FORGE)
+                    types.add(PlatformType.MCP)
+                }
+
+                facet.refresh()
             }
-
-            facet.refresh()
         }
 
         private fun autoDetectTypes(module: Module): Set<PlatformType> {

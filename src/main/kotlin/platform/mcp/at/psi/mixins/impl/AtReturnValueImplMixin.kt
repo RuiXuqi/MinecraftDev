@@ -34,7 +34,9 @@ abstract class AtReturnValueImplMixin(node: ASTNode) : ASTWrapperPsiElement(node
     override val returnValueClass: PsiClass?
         get() = AtSymbolResolver.resolve(this) as? PsiClass
 
-    override fun getReference(): PsiReference = AtSymbolReference(this)
+    private val cachedRef: PsiReference by lazy { AtSymbolReference(this) }
+
+    override fun getReference(): PsiReference = cachedRef
 
     override val returnValueText: String
         get() = primitive?.text ?: classValue!!.text

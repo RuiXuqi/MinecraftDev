@@ -27,6 +27,7 @@ import com.demonwav.mcdev.platform.mixin.handlers.ShadowHandler
 import com.demonwav.mcdev.util.ActionData
 import com.demonwav.mcdev.util.getDataFromActionEvent
 import com.demonwav.mcdev.util.showBalloon
+import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.psi.PsiElement
@@ -35,6 +36,8 @@ import com.intellij.psi.PsiMember
 import com.intellij.psi.PsiReference
 
 abstract class SrgActionBase : AnAction() {
+
+    override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
     override fun actionPerformed(e: AnActionEvent) {
         val data = getDataFromActionEvent(e) ?: return showBalloon(e, "Unknown failure")

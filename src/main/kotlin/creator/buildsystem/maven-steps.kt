@@ -30,7 +30,6 @@ import com.demonwav.mcdev.creator.step.AbstractReformatFilesStep
 import com.demonwav.mcdev.creator.step.DescriptionStep
 import com.demonwav.mcdev.creator.step.FixedAssetsNewProjectWizardStep
 import com.demonwav.mcdev.creator.step.WebsiteStep
-import com.demonwav.mcdev.util.invokeAndWait
 import com.demonwav.mcdev.util.runWriteAction
 import com.demonwav.mcdev.util.runWriteTask
 import com.intellij.execution.RunManager
@@ -126,36 +125,34 @@ abstract class AbstractPatchPomStep(parent: NewProjectWizardStep) : AbstractLong
     }
 
     override fun perform(project: Project) {
-        invokeAndWait {
+        runWriteTask {
             if (project.isDisposed || !project.isInitialized) {
                 notifyCreatedProjectNotOpened()
-                return@invokeAndWait
+                return@runWriteTask
             }
 
-            runWriteTask {
-                val pomFile = VfsUtil.findFile(Path.of(context.projectFileDirectory, "pom.xml"), true)
-                    ?: return@runWriteTask
-                val pomPsi = PsiManager.getInstance(project).findFile(pomFile) as? XmlFile ?: return@runWriteTask
+            val pomFile = VfsUtil.findFile(Path.of(context.projectFileDirectory, "pom.xml"), true)
+                ?: return@runWriteTask
+            val pomPsi = PsiManager.getInstance(project).findFile(pomFile) as? XmlFile ?: return@runWriteTask
 
-                pomPsi.name = "pom.xml"
+            pomPsi.name = "pom.xml"
 
-                NonProjectFileWritingAccessProvider.disableChecksDuring {
-                    pomPsi.runWriteAction {
-                        val manager = DomManager.getDomManager(project)
-                        val mavenProjectXml =
-                            manager.getFileElement(pomPsi, MavenDomProjectModel::class.java)?.rootElement
-                                ?: return@runWriteAction
-
-                        val root = pomPsi.rootTag ?: return@runWriteAction
-
-                        patchPom(mavenProjectXml, root)
-
-                        // The maven importer requires that the document is saved to disk
-                        val document = PsiDocumentManager.getInstance(project).getDocument(pomPsi)
+            NonProjectFileWritingAccessProvider.disableChecksDuring {
+                pomPsi.runWriteAction {
+                    val manager = DomManager.getDomManager(project)
+                    val mavenProjectXml =
+                        manager.getFileElement(pomPsi, MavenDomProjectModel::class.java)?.rootElement
                             ?: return@runWriteAction
-                        PsiDocumentManager.getInstance(project).doPostponedOperationsAndUnblockDocument(document)
-                        FileDocumentManager.getInstance().saveDocument(document)
-                    }
+
+                    val root = pomPsi.rootTag ?: return@runWriteAction
+
+                    patchPom(mavenProjectXml, root)
+
+                    // The maven importer requires that the document is saved to disk
+                    val document = PsiDocumentManager.getInstance(project).getDocument(pomPsi)
+                        ?: return@runWriteAction
+                    PsiDocumentManager.getInstance(project).doPostponedOperationsAndUnblockDocument(document)
+                    FileDocumentManager.getInstance().saveDocument(document)
                 }
             }
         }

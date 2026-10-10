@@ -26,7 +26,6 @@ import com.demonwav.mcdev.platform.AbstractModule
 import com.demonwav.mcdev.platform.PlatformType
 import com.demonwav.mcdev.platform.mcp.mappings.MappingsManager
 import com.demonwav.mcdev.platform.mcp.util.McpConstants
-import com.demonwav.mcdev.translations.TranslationFileListener
 import com.demonwav.mcdev.util.runWriteTaskLater
 import com.intellij.json.JsonFileType
 import com.intellij.openapi.application.ApplicationManager
@@ -34,17 +33,13 @@ import com.intellij.openapi.externalSystem.importing.ImportSpecBuilder
 import com.intellij.openapi.externalSystem.util.ExternalSystemUtil
 import com.intellij.openapi.fileTypes.FileTypeManager
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiMethod
-import com.intellij.util.messages.MessageBusConnection
 import javax.swing.Icon
 import org.jetbrains.plugins.gradle.settings.GradleSettings
 import org.jetbrains.plugins.gradle.util.GradleConstants
 
 class McpModule(facet: MinecraftFacet) : AbstractModule(facet) {
-
-    private lateinit var connection: MessageBusConnection
 
     private val settings: McpModuleSettings = McpModuleSettings.getInstance(module)
     val accessTransformers = mutableSetOf<VirtualFile>()
@@ -54,8 +49,6 @@ class McpModule(facet: MinecraftFacet) : AbstractModule(facet) {
 
     override fun init() {
         initSrg()
-        connection = project.messageBus.connect()
-        connection.subscribe(VirtualFileManager.VFS_CHANGES, TranslationFileListener)
 
         runWriteTaskLater {
             FileTypeManager.getInstance().associatePattern(JsonFileType.INSTANCE, McpConstants.PNG_MCMETA)
@@ -113,7 +106,6 @@ class McpModule(facet: MinecraftFacet) : AbstractModule(facet) {
     override fun dispose() {
         super.dispose()
 
-        connection.disconnect()
         accessTransformers.clear()
         mappingsManager = null
     }

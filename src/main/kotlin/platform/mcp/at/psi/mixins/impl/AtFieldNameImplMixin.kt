@@ -29,7 +29,9 @@ import com.intellij.psi.PsiReference
 
 abstract class AtFieldNameImplMixin(node: ASTNode) : ASTWrapperPsiElement(node), AtFieldNameMixin {
 
-    override fun getReference(): PsiReference = AtSymbolReference(this)
+    private val cachedRef: PsiReference by lazy { AtSymbolReference(this) }
+
+    override fun getReference(): PsiReference = cachedRef
 
     override fun setFieldName(fieldName: String) {
         replace(AtElementFactory.createFieldName(project, fieldName))

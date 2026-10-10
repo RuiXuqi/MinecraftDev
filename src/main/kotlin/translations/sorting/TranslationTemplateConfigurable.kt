@@ -27,6 +27,7 @@ import com.intellij.codeInsight.template.impl.TemplateEditorUtil
 import com.intellij.ide.DataManager
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.openapi.editor.ex.EditorEx
 import com.intellij.openapi.editor.ex.util.LexerEditorHighlighter
@@ -119,6 +120,7 @@ class TranslationTemplateConfigurable(private val project: Project) : Configurab
     }
 
     private fun setupEditor() {
+        releaseEditor()
         templateEditor = TemplateEditorUtil.createEditor(false, getActiveTemplateText())
         val editorColorsScheme = EditorColorsManager.getInstance().globalScheme
         val highlighter = LexerEditorHighlighter(
@@ -130,6 +132,19 @@ class TranslationTemplateConfigurable(private val project: Project) : Configurab
 
         editorPanel.removeAll()
         editorPanel.add(templateEditor!!.component, BorderLayout.CENTER)
+    }
+
+    private fun releaseEditor() {
+        templateEditor?.let { editor ->
+            if (!editor.isDisposed) {
+                EditorFactory.getInstance().releaseEditor(editor)
+            }
+        }
+        templateEditor = null
+    }
+
+    override fun disposeUIResources() {
+        releaseEditor()
     }
 
     override fun isModified(): Boolean {

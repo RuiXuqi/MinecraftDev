@@ -21,6 +21,7 @@
 package com.demonwav.mcdev.platform.mcp.at
 
 import com.demonwav.mcdev.platform.mcp.at.gen.psi.AtEntry
+import com.demonwav.mcdev.util.cached
 import com.intellij.codeInspection.LocalInspectionTool
 import com.intellij.codeInspection.ProblemHighlightType
 import com.intellij.codeInspection.ProblemsHolder
@@ -28,6 +29,7 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiElementVisitor
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.search.searches.ReferencesSearch
+import com.intellij.psi.util.PsiModificationTracker
 import com.intellij.util.Processor
 
 class AtUsageInspection : LocalInspectionTool() {
@@ -46,8 +48,11 @@ class AtUsageInspection : LocalInspectionTool() {
                 val source = element.function?.funcName ?: element.fieldName ?: return
                 val psi = AtSymbolResolver.resolve(source) ?: return
 
-                val query = ReferencesSearch.search(psi, GlobalSearchScope.projectScope(element.project))
-                val hasNonAtUsage = !query.forEach(Processor { it.element.containingFile is AtFile })
+                // The project-wide reference search is expensive; cache per AT entry until PSI changes
+                val hasNonAtUsage = element.cached(PsiModificationTracker.MODIFICATION_COUNT) {
+                    val query = ReferencesSearch.search(psi, GlobalSearchScope.projectScope(element.project))
+                    !query.forEach(Processor { it.element.containingFile is AtFile })
+                }
                 if (!hasNonAtUsage) {
                     holder.registerProblem(
                         element,

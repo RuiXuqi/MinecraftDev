@@ -51,18 +51,21 @@ open class PaperVersionCreatorProperty(
 
     @OptIn(DelicateCoroutinesApi::class)
     companion object {
+        @Volatile
         private var paperVersions: List<SemanticVersion>? = null
 
         suspend fun getPaperVersions(): List<SemanticVersion> {
             paperVersions?.let { return it }
 
-            val client = HttpClient()
-            val response = client.get("https://fill.papermc.io/v3/projects/paper", block = {
-                this.header("User-Agent", "minecraft-dev/${PluginUtil.pluginVersion} (https://github.com/minecraft-dev/MinecraftDev)")
-            })
-            if (response.status.isSuccess()) {
+            val result = HttpClient().use { client ->
+                val response = client.get("https://fill.papermc.io/v3/projects/paper", block = {
+                    this.header("User-Agent", "minecraft-dev/${PluginUtil.pluginVersion} (https://github.com/minecraft-dev/MinecraftDev)")
+                })
+                if (!response.status.isSuccess()) {
+                    return@use null
+                }
                 val element = Json.parseToJsonElement(response.bodyAsText())
-                val result = element.jsonObject["versions"]?.jsonObject?.values
+                element.jsonObject["versions"]?.jsonObject?.values
                     ?.asSequence()
                     ?.flatMap { it.jsonArray }
                     ?.map { it.jsonPrimitive.content }
@@ -73,11 +76,11 @@ open class PaperVersionCreatorProperty(
                     ?.filter { it >= MinecraftVersions.MC1_18_2 }
                     ?.toList()
                     ?.sortedDescending()
+            }
 
-                if (result != null) {
-                    paperVersions = result
-                    return result
-                }
+            if (result != null) {
+                paperVersions = result
+                return result
             }
 
             return emptyList()

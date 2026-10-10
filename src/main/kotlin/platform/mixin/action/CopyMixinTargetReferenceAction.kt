@@ -24,6 +24,7 @@ import com.demonwav.mcdev.platform.mixin.handlers.injectionPoint.QualifiedMember
 import com.demonwav.mcdev.util.findReferencedMember
 import com.demonwav.mcdev.util.getQualifiedMemberReference
 import com.demonwav.mcdev.util.qualifiedMemberReference
+import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys.CARET
@@ -36,6 +37,8 @@ import com.intellij.psi.PsiQualifiedReference
 import java.awt.datatransfer.StringSelection
 
 class CopyMixinTargetReferenceAction : AnAction() {
+
+    override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return

@@ -22,7 +22,6 @@ package com.demonwav.mcdev.util
 
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.ModalityState
-import com.intellij.openapi.application.TransactionGuard
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
@@ -86,17 +85,11 @@ operator fun Manifest.get(attribute: Attributes.Name): String? = mainAttributes.
 suspend fun VirtualFile.refreshSync(modalityState: ModalityState): VirtualFile? {
     val file = this
     return withContext(Dispatchers.EDT) {
-        val state = if (TransactionGuard.getInstance().isWriteSafeModality(modalityState)) {
-            modalityState
-        } else {
-            ModalityState.current()
-        }
-
-        return@withContext suspendCancellableCoroutine { continuation ->
+        suspendCancellableCoroutine { continuation ->
             try {
                 RefreshQueue.getInstance().refresh(true, file.isDirectory, {
                     continuation.resume(file.parent?.findChild(file.name))
-                }, state, file)
+                }, modalityState, file)
             } catch (t: Throwable) {
                 continuation.cancel(t)
             }
