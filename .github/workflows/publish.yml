@@ -8,6 +8,8 @@ jobs:
   publish:
     name: Publish
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout sources
         uses: actions/checkout@v5
@@ -42,7 +44,7 @@ jobs:
       - name: Build plugin
         env:
           NO_SENTRY: "true"
-        run: ./gradlew clean buildPlugin --stacktrace
+        run: ./gradlew clean buildPlugin -PpluginVersion="${{ steps.get_tag.outputs.release }}" --stacktrace
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         env:
