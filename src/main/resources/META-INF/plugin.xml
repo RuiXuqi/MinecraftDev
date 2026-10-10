@@ -35,7 +35,7 @@
     <depends optional="true" config-file="mcdev-toml.xml">org.toml.lang</depends>
     <depends optional="true" config-file="mcdev-yaml.xml">org.jetbrains.plugins.yaml</depends>
 
-    <id>com.demonwav.minecraft-dev</id>
+    <id>io.github.ruixuqi.minecraft-dev</id>
     <name>Minecraft Development</name>
     <vendor email="kyle@denwav.dev" url="https://mcdev.io/">minecraft-dev</vendor>
 
@@ -66,65 +66,65 @@
     </change-notes>
 
     <extensionPoints>
-        <extensionPoint name="platformTypeWizard"
+        <extensionPoint qualifiedName="com.demonwav.minecraft-dev.platformTypeWizard"
                         interface="com.demonwav.mcdev.creator.platformtype.PlatformTypeStep$Factory" dynamic="true"/>
-        <extensionPoint name="modPlatformWizard"
+        <extensionPoint qualifiedName="com.demonwav.minecraft-dev.modPlatformWizard"
                         interface="com.demonwav.mcdev.creator.platformtype.ModPlatformStep$Factory" dynamic="true"/>
-        <extensionPoint name="pluginPlatformWizard"
+        <extensionPoint qualifiedName="com.demonwav.minecraft-dev.pluginPlatformWizard"
                         interface="com.demonwav.mcdev.creator.platformtype.PluginPlatformStep$Factory" dynamic="true"/>
-        <extensionPoint name="bukkitPlatformWizard"
+        <extensionPoint qualifiedName="com.demonwav.minecraft-dev.bukkitPlatformWizard"
                         interface="com.demonwav.mcdev.platform.bukkit.creator.BukkitPlatformStep$Factory"
                         dynamic="true"/>
-        <extensionPoint name="bungeePlatformWizard"
+        <extensionPoint qualifiedName="com.demonwav.minecraft-dev.bungeePlatformWizard"
                         interface="com.demonwav.mcdev.platform.bungeecord.creator.BungeePlatformStep$Factory"
                         dynamic="true"/>
-        <extensionPoint name="projectSetupFinalizer"
+        <extensionPoint qualifiedName="com.demonwav.minecraft-dev.projectSetupFinalizer"
                         interface="com.demonwav.mcdev.creator.ProjectSetupFinalizer$Factory" dynamic="true"/>
 
-        <extensionPoint name="buildSystemWizard"
+        <extensionPoint qualifiedName="com.demonwav.minecraft-dev.buildSystemWizard"
                         interface="com.demonwav.mcdev.creator.buildsystem.AbstractBuildSystemStep$Factory"
                         dynamic="true"/>
-        <extensionPoint name="buildSystemSupport"
+        <extensionPoint qualifiedName="com.demonwav.minecraft-dev.buildSystemSupport"
                         beanClass="com.demonwav.mcdev.creator.buildsystem.BuildSystemSupportEntry" dynamic="true">
             <with attribute="implementation" implements="com.demonwav.mcdev.creator.buildsystem.BuildSystemSupport"/>
         </extensionPoint>
 
-        <extensionPoint name="gradleFileType" interface="com.demonwav.mcdev.creator.buildsystem.GradleFile$Type"
+        <extensionPoint qualifiedName="com.demonwav.minecraft-dev.gradleFileType" interface="com.demonwav.mcdev.creator.buildsystem.GradleFile$Type"
                         dynamic="true"/>
 
-        <extensionPoint name="creatorPropertyType"
+        <extensionPoint qualifiedName="com.demonwav.minecraft-dev.creatorPropertyType"
                         beanClass="com.demonwav.mcdev.creator.custom.types.CreatorPropertyFactoryBean" dynamic="true">
             <with attribute="implementation"
                   implements="com.demonwav.mcdev.creator.custom.types.CreatorPropertyFactory"/>
         </extensionPoint>
-        <extensionPoint name="creatorTemplateProvider"
+        <extensionPoint qualifiedName="com.demonwav.minecraft-dev.creatorTemplateProvider"
                         beanClass="com.demonwav.mcdev.creator.custom.providers.TemplateProviderBean" dynamic="true">
             <with attribute="implementation" implements="com.demonwav.mcdev.creator.custom.providers.TemplateProvider"/>
         </extensionPoint>
-        <extensionPoint name="creatorFinalizer"
+        <extensionPoint qualifiedName="com.demonwav.minecraft-dev.creatorFinalizer"
                         beanClass="com.demonwav.mcdev.creator.custom.finalizers.CreatorFinalizerBean" dynamic="true">
             <with attribute="implementation"
                   implements="com.demonwav.mcdev.creator.custom.finalizers.CreatorFinalizer"/>
         </extensionPoint>
 
-        <extensionPoint name="mixinSelectorParser" interface="com.demonwav.mcdev.platform.mixin.reference.MixinSelectorParser" dynamic="true"/>
-        <extensionPoint name="mixinAnnotationHandler" beanClass="com.demonwav.mcdev.platform.mixin.handlers.MixinAnnotationHandlerInfo" dynamic="true">
+        <extensionPoint qualifiedName="com.demonwav.minecraft-dev.mixinSelectorParser" interface="com.demonwav.mcdev.platform.mixin.reference.MixinSelectorParser" dynamic="true"/>
+        <extensionPoint qualifiedName="com.demonwav.minecraft-dev.mixinAnnotationHandler" beanClass="com.demonwav.mcdev.platform.mixin.handlers.MixinAnnotationHandlerInfo" dynamic="true">
             <with attribute="implementation" implements="com.demonwav.mcdev.platform.mixin.handlers.MixinAnnotationHandler"/>
         </extensionPoint>
-        <extensionPoint name="injectionPoint"
+        <extensionPoint qualifiedName="com.demonwav.minecraft-dev.injectionPoint"
                         beanClass="com.demonwav.mcdev.platform.mixin.handlers.injectionPoint.InjectionPointInfo"
                         dynamic="true">
             <with attribute="implementation"
                   implements="com.demonwav.mcdev.platform.mixin.handlers.injectionPoint.InjectionPoint"/>
         </extensionPoint>
-        <extensionPoint name="injectionPointAnnotation"
+        <extensionPoint qualifiedName="com.demonwav.minecraft-dev.injectionPointAnnotation"
                         beanClass="com.demonwav.mcdev.platform.mixin.handlers.injectionPoint.InjectionPointAnnotation"
                         dynamic="true"/>
-        <extensionPoint name="missingLVTChecker"
+        <extensionPoint qualifiedName="com.demonwav.minecraft-dev.missingLVTChecker"
                         interface="com.demonwav.mcdev.platform.mixin.util.MissingLVTChecker"
                         dynamic="true"/>
 
-        <extensionPoint name="eventGenHelper" beanClass="com.intellij.lang.LanguageExtensionPoint" dynamic="true">
+        <extensionPoint qualifiedName="com.demonwav.minecraft-dev.eventGenHelper" beanClass="com.intellij.lang.LanguageExtensionPoint" dynamic="true">
             <with attribute="implementationClass" implements="com.demonwav.mcdev.insight.generation.EventGenHelper"/>
         </extensionPoint>
     </extensionPoints>
@@ -657,11 +657,11 @@
         <colorSettingsPage implementation="com.demonwav.mcdev.platform.mcp.at.AtColorSettingsPage"/>
         <lang.commenter language="Access Transformers"
                         implementationClass="com.demonwav.mcdev.platform.mcp.at.AtCommenter"/>
+        <lang.elementManipulator forClass="com.demonwav.mcdev.platform.mcp.at.gen.psi.AtClassName"
+                                 implementationClass="com.demonwav.mcdev.platform.mcp.at.psi.AtClassNameManipulator"/>
         <typedHandler implementation="com.demonwav.mcdev.platform.mcp.at.completion.AtTypedHandlerDelegate"/>
         <completion.contributor language="Access Transformers"
                                 implementationClass="com.demonwav.mcdev.platform.mcp.at.completion.AtCompletionContributor"/>
-        <gotoDeclarationHandler implementation="com.demonwav.mcdev.platform.mcp.at.AtGotoDeclarationHandler"/>
-        <annotator language="Access Transformers" implementationClass="com.demonwav.mcdev.platform.mcp.at.AtAnnotator"/>
 
         <!-- class tweaker file type -->
         <fileType name="Class Tweaker" language="Class Tweaker"
@@ -1657,6 +1657,8 @@
         <projectResolve implementation="com.demonwav.mcdev.platform.mcp.fabricloom.FabricLoomProjectResolverExtension"/>
         <projectResolve
             implementation="com.demonwav.mcdev.platform.architectury.framework.ArchitecturyProjectResolverExtension"/>
+        <projectResolve
+            implementation="com.demonwav.mcdev.platform.mcp.unimined.UniminedProjectResolverExtension"/>
     </extensions>
 
     <applicationListeners>

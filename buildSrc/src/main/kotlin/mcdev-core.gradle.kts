@@ -38,7 +38,10 @@ val ideaVersionName: String by project
 val coreVersion: String by project
 val buildNumber: String? by project
 
-version = "$ideaVersionName-$coreVersion"
+// Release builds pass the full counter version (e.g. 2026.2-1.8.22.3) from the pushed tag via -PpluginVersion.
+val pluginVersion: String? by project
+
+version = pluginVersion ?: "$ideaVersionName-$coreVersion"
 
 // Build numbers are used for nightlies
 if (buildNumber != null) {

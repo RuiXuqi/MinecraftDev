@@ -31,12 +31,18 @@ import com.intellij.openapi.module.ModuleManager
 @State(name = "McpModuleSettings", storages = [Storage(StoragePathMacros.MODULE_FILE)])
 class McpModuleSettings : PersistentStateComponent<McpModuleSettings.State> {
 
+    enum class AccessTransformerNamespace {
+        INTERMEDIARY,
+        NAMED,
+    }
+
     data class State(
         var minecraftVersion: String? = null,
         var mcpVersion: String? = null,
         var mappingFile: String? = null,
         var srgType: SrgType? = null,
         var platformVersion: String? = null,
+        var accessTransformerNamespace: AccessTransformerNamespace = AccessTransformerNamespace.INTERMEDIARY,
     )
 
     private var state: State = State(srgType = SrgType.SRG)

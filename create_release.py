@@ -19,6 +19,26 @@ from typing import List, Tuple
 
 BRANCHES=["2025.3", "2026.1", "2026.2", "2026.3"]
 
+def next_release_counter(version: str, branches: List[str]) -> int:
+    """Pick the next fork release counter for tags named <version>.<counter>-<branch>."""
+    rc, out, _ = run_git(["ls-remote", "--tags", "origin"])
+    if rc != 0:
+        print("Warning: could not list tags on origin; starting the counter at 1.", file=sys.stderr)
+        return 1
+
+    prefix = f"refs/tags/{version}."
+    counters = []
+    for line in out.splitlines():
+        ref = line.split("\t")[-1].strip()
+        if not ref.startswith(prefix):
+            continue
+        suffix = ref[len("refs/tags/") + len(version) + 1:]
+        for branch in branches:
+            digits = suffix[: -(len(branch) + 1)]
+            if suffix.endswith("-" + branch) and digits.isdigit():
+                counters.append(int(digits))
+    return max(counters) + 1 if counters else 1
+
 def check_file_contains_version(path: str, version: str) -> bool:
     try:
         with open(path, "r") as fh:
@@ -183,10 +203,12 @@ def fetch_origin(dry_run: bool):
 
 def parse_args():
     p = argparse.ArgumentParser(description="Merge release branches and create/push tags non-interactively.")
-    p.add_argument("version", help="version string to append to tags (used as <version>-<branch>)")
+    p.add_argument("version", help="upstream core version; tags are created as <version>.<counter>-<branch>")
     p.add_argument("--branches", nargs="+",
                    default=BRANCHES,
                    help="space-separated list of branches in order (default: %(default)s)")
+    p.add_argument("--counter", default="auto",
+                   help="release counter appended to tags; 'auto' picks the next free one (default: %(default)s)")
     p.add_argument("--dry-run", action="store_true", help="show commands without executing them")
     p.add_argument("--no-push", dest="push", action="store_false", help="do not push tags to origin")
     return p.parse_args()
@@ -209,6 +231,10 @@ def main():
         sys.exit(1)
 
     fetch_origin(dry_run=dry_run)
+
+    counter = next_release_counter(version, branches) if args.counter == "auto" else int(args.counter)
+    version = f"{version}.{counter}"
+    print(f"Releasing as {version}")
 
     prev = "dev"
     for br in branches:
