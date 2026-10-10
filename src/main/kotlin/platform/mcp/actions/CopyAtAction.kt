@@ -20,6 +20,8 @@
 
 package com.demonwav.mcdev.platform.mcp.actions
 
+import com.demonwav.mcdev.platform.mcp.McpModule
+import com.demonwav.mcdev.platform.mcp.McpModuleSettings.AccessTransformerNamespace
 import com.demonwav.mcdev.platform.mcp.mappings.Mappings
 import com.demonwav.mcdev.util.ActionData
 import com.demonwav.mcdev.util.descriptor
@@ -36,6 +38,9 @@ import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
 
 class CopyAtAction : SrgActionBase() {
+    override fun requiresSrgMappings(mcpModule: McpModule?) =
+        mcpModule?.getSettings()?.accessTransformerNamespace != AccessTransformerNamespace.NAMED
+
     override fun withSrgTarget(parent: PsiElement, srgMap: Mappings?, e: AnActionEvent, data: ActionData) {
         if (srgMap == null) {
             when (parent) {
@@ -50,6 +55,7 @@ class CopyAtAction : SrgActionBase() {
                         className + " " + parent.name,
                     )
                 }
+
                 is PsiMethod -> {
                     val className = parent.containingClass?.fullQualifiedName ?: return showBalloon(
                         e,
@@ -61,6 +67,7 @@ class CopyAtAction : SrgActionBase() {
                         className + " " + parent.name + parent.descriptor,
                     )
                 }
+
                 is PsiClass -> {
                     val className = parent.fullQualifiedName ?: return showBalloon(e, "Could not get FQN")
                     copyToClipboard(

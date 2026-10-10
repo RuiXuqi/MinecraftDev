@@ -50,10 +50,8 @@ object PluginUpdater {
     }
 
     private fun updateCheck(callback: (PluginUpdateStatus) -> Boolean) {
-        var updateStatus: PluginUpdateStatus
+        var updateStatus: PluginUpdateStatus = PluginUpdateStatus.LatestVersionInstalled
         try {
-            updateStatus = checkUpdatesInMainRepo()
-
             RepositoryHelper.getPluginHosts()
                 .forEachNotNull { updateStatus = updateStatus.mergeWith(checkUpdatesInCustomRepo(it)) }
 

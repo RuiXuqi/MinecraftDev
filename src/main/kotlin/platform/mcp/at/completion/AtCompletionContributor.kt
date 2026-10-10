@@ -24,37 +24,51 @@ import com.demonwav.mcdev.facet.MinecraftFacet
 import com.demonwav.mcdev.platform.mcp.McpModuleType
 import com.demonwav.mcdev.platform.mcp.at.AtElementFactory
 import com.demonwav.mcdev.platform.mcp.at.AtLanguage
+import com.demonwav.mcdev.platform.mcp.at.AtNamespaceMapper
+import com.demonwav.mcdev.platform.mcp.at.gen.psi.AtClassName
 import com.demonwav.mcdev.platform.mcp.at.gen.psi.AtEntry
 import com.demonwav.mcdev.platform.mcp.at.gen.psi.AtFieldName
 import com.demonwav.mcdev.platform.mcp.at.gen.psi.AtFunction
 import com.demonwav.mcdev.platform.mcp.at.gen.psi.AtTypes
 import com.demonwav.mcdev.util.anonymousClasses
 import com.demonwav.mcdev.util.fullQualifiedName
-import com.demonwav.mcdev.util.getSimilarity
 import com.demonwav.mcdev.util.localClasses
 import com.demonwav.mcdev.util.nameAndParameterTypes
-import com.demonwav.mcdev.util.qualifiedMemberReference
-import com.demonwav.mcdev.util.simpleQualifiedMemberReference
+import com.intellij.codeInsight.AutoPopupController
+import com.intellij.codeInsight.TailTypes
+import com.intellij.codeInsight.completion.AllClassesGetter
 import com.intellij.codeInsight.completion.CompletionContributor
 import com.intellij.codeInsight.completion.CompletionParameters
 import com.intellij.codeInsight.completion.CompletionResultSet
 import com.intellij.codeInsight.completion.CompletionType
 import com.intellij.codeInsight.completion.CompletionUtil
+import com.intellij.codeInsight.completion.InsertionContext
+import com.intellij.codeInsight.completion.JavaClassNameCompletionContributor
 import com.intellij.codeInsight.completion.PrioritizedLookupElement
+import com.intellij.codeInsight.lookup.LookupElement
 import com.intellij.codeInsight.lookup.LookupElementBuilder
+import com.intellij.codeInsight.lookup.LookupElementDecorator
+import com.intellij.codeInsight.lookup.PackageLookupItem
+import com.intellij.codeInsight.lookup.TailTypeDecorator
+import com.intellij.openapi.module.Module
 import com.intellij.openapi.module.ModuleUtilCore
 import com.intellij.patterns.PlatformPatterns.elementType
 import com.intellij.patterns.PlatformPatterns.psiElement
 import com.intellij.patterns.PsiElementPattern
 import com.intellij.psi.JavaPsiFacade
+import com.intellij.psi.CommonReferenceProviderTypes
+import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiPackage
+import com.intellij.psi.PsiWhiteSpace
 import com.intellij.psi.search.GlobalSearchScope
-import com.intellij.psi.search.PsiShortNamesCache
 import com.intellij.psi.tree.IElementType
 import com.intellij.psi.tree.TokenSet
+import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.util.PsiUtilCore
 import com.intellij.util.PlatformIcons
+import com.intellij.util.ProcessingContext
 
 class AtCompletionContributor : CompletionContributor() {
 
@@ -68,62 +82,76 @@ class AtCompletionContributor : CompletionContributor() {
             return
         }
 
+        val linePrefix = parameters.originalFile.text
+            .substring(0, parameters.offset.coerceAtMost(parameters.originalFile.textLength))
+            .substringAfterLast('\n')
+            .trimStart()
+        if (linePrefix.isEmpty() || (!linePrefix.startsWith('#') && linePrefix.none(Char::isWhitespace))) {
+            handleKeyword(linePrefix, result)
+            return
+        }
+
         val parent = position.parent
 
         val parentText = parent.text ?: return
-        if (parentText.length < CompletionUtil.DUMMY_IDENTIFIER.length) {
+        if (parentText.length < CompletionUtil.DUMMY_IDENTIFIER_TRIMMED.length) {
             return
         }
-        val text = parentText.substring(0, parentText.length - CompletionUtil.DUMMY_IDENTIFIER.length)
+        val text = parentText.removeSuffix(CompletionUtil.DUMMY_IDENTIFIER_TRIMMED)
+        val afterKeyword = Const.AFTER_KEYWORD.accepts(parent)
+        val afterClassName = Const.AFTER_CLASS_NAME.accepts(parent)
+        val module by lazy { ModuleUtilCore.findModuleForPsiElement(parameters.originalFile) }
 
         when {
-            Const.AFTER_KEYWORD.accepts(parent) -> handleAtClassName(text, parent, result)
-            Const.AFTER_CLASS_NAME.accepts(parent) -> handleAtName(text, parent, result)
-            Const.AFTER_NEWLINE.accepts(parent) -> handleNewLine(text, result)
+            afterKeyword -> {
+                handleAtClassName(
+                    parent as? AtClassName ?: return,
+                    text,
+                    findClassSegmentPrefix(parameters),
+                    module ?: return,
+                    result,
+                )
+            }
+
+            afterClassName -> {
+                var originalElement = parameters.originalFile.findElementAt(parameters.offset - 1) ?: return
+                while (originalElement is PsiWhiteSpace) {
+                    originalElement = PsiTreeUtil.prevLeaf(originalElement, true) ?: return
+                }
+                val originalEntry = PsiTreeUtil.getParentOfType(originalElement, AtEntry::class.java) ?: return
+                handleAtName(text, originalEntry, module ?: return, result)
+            }
+
         }
     }
 
-    private fun handleAtClassName(text: String, element: PsiElement, result: CompletionResultSet) {
+    private fun handleAtClassName(
+        className: AtClassName,
+        text: String,
+        segmentPrefix: String,
+        module: Module,
+        result: CompletionResultSet,
+    ) {
         if (text.isEmpty()) {
             return
         }
 
-        val currentPackage = text.substringBeforeLast('.', "")
-        val beginning = text.substringAfterLast('.', "")
+        val currentSegmentPrefix = segmentPrefix.ifEmpty { text.substringAfterLast('.') }
 
-        if (currentPackage == "" || beginning == "") {
-            return
-        }
-
-        val module = ModuleUtilCore.findModuleForPsiElement(element) ?: return
         val scope = GlobalSearchScope.moduleWithDependenciesAndLibrariesScope(module)
         val project = module.project
 
+        if (!text.contains('$')) {
+            addQualifiedClassVariants(className, text, result)
+        }
+
         // Short name completion
         if (!text.contains('.')) {
-            val kindResult = result.withPrefixMatcher(KindPrefixMatcher(text))
-            val cache = PsiShortNamesCache.getInstance(project)
-
-            var counter = 0
-            for (className in cache.allClassNames) {
-                if (!className.contains(beginning, ignoreCase = true)) {
-                    continue
-                }
-
-                if (counter++ > 1000) {
-                    break // Prevent insane CPU usage
-                }
-
-                val classesByName = cache.getClassesByName(className, scope)
-                for (classByName in classesByName) {
-                    val name = classByName.fullQualifiedName ?: continue
-                    kindResult.addElement(
-                        PrioritizedLookupElement.withPriority(
-                            LookupElementBuilder.create(name).withIcon(PlatformIcons.CLASS_ICON),
-                            1.0 + name.getValue(beginning),
-                        ),
-                    )
-                }
+            val classResult = result.withPrefixMatcher(currentSegmentPrefix)
+            AllClassesGetter.processJavaClasses(classResult.prefixMatcher, project, scope) { psiClass ->
+                val name = psiClass.fullQualifiedName ?: return@processJavaClasses true
+                classResult.addElement(createClassLookupElement(psiClass, name))
+                true
             }
         }
 
@@ -133,14 +161,16 @@ class AtCompletionContributor : CompletionContributor() {
                 JavaPsiFacade.getInstance(project).findClass(text.substringBeforeLast('$'), scope) ?: return
 
             for (innerClass in currentClass.allInnerClasses) {
-                if (innerClass.name?.contains(beginning.substringAfterLast('$'), ignoreCase = true) != true) {
+                if (
+                    innerClass.name?.contains(currentSegmentPrefix.substringAfterLast('$'), ignoreCase = true) != true
+                ) {
                     continue
                 }
 
                 val name = innerClass.fullQualifiedName ?: continue
                 result.addElement(
                     PrioritizedLookupElement.withPriority(
-                        LookupElementBuilder.create(name).withIcon(PlatformIcons.CLASS_ICON),
+                        createBinaryClassLookupElement(innerClass, name),
                         1.0,
                     ),
                 )
@@ -150,7 +180,7 @@ class AtCompletionContributor : CompletionContributor() {
                 val name = anonClass.fullQualifiedName ?: continue
                 result.addElement(
                     PrioritizedLookupElement.withPriority(
-                        LookupElementBuilder.create(name).withIcon(PlatformIcons.CLASS_ICON),
+                        createBinaryClassLookupElement(anonClass, name),
                         1.0,
                     ),
                 )
@@ -160,7 +190,7 @@ class AtCompletionContributor : CompletionContributor() {
                 val name = localClass.fullQualifiedName ?: continue
                 result.addElement(
                     PrioritizedLookupElement.withPriority(
-                        LookupElementBuilder.create(name).withIcon(PlatformIcons.CLASS_ICON),
+                        createBinaryClassLookupElement(localClass, name),
                         1.0,
                     ),
                 )
@@ -168,84 +198,66 @@ class AtCompletionContributor : CompletionContributor() {
 
             return
         }
+    }
 
-        val psiPackage = JavaPsiFacade.getInstance(project).findPackage(currentPackage) ?: return
-
-        // Classes in package completion
-        val used = mutableSetOf<String>()
-        for (psiClass in psiPackage.classes) {
-            if (psiClass.name == null) {
-                continue
+    private fun addQualifiedClassVariants(
+        className: AtClassName,
+        classNameText: String,
+        result: CompletionResultSet,
+    ) {
+        val provider = CommonReferenceProviderTypes.getInstance().classReferenceProvider
+        val reference = provider.getReferencesByElement(className, ProcessingContext()).lastOrNull() ?: return
+        for (variant in reference.variants) {
+            val lookupElement = variant as? LookupElement ?: continue
+            val qualifier = classNameText.substringBeforeLast('.', "")
+            val qualifiedLookupString = if (qualifier.isEmpty()) {
+                lookupElement.lookupString
+            } else {
+                "$qualifier.${lookupElement.lookupString}"
             }
-
-            if (!psiClass.name!!.contains(beginning, ignoreCase = true) || psiClass.name == "package-info") {
-                continue
-            }
-
-            if (!used.add(psiClass.name!!)) {
-                continue
-            }
-
-            val name = psiClass.fullQualifiedName ?: continue
-            result.addElement(
-                PrioritizedLookupElement.withPriority(
-                    LookupElementBuilder.create(name).withIcon(PlatformIcons.CLASS_ICON),
-                    1.0,
-                ),
-            )
-        }
-        used.clear() // help GC
-
-        // Packages in package completion
-        for (subPackage in psiPackage.subPackages) {
-            if (subPackage.name == null) {
-                continue
-            }
-
-            if (!subPackage.name!!.contains(beginning, ignoreCase = true)) {
-                continue
-            }
-
-            val name = subPackage.qualifiedName
-            result.addElement(
-                PrioritizedLookupElement.withPriority(
-                    LookupElementBuilder.create(name).withIcon(PlatformIcons.PACKAGE_ICON),
-                    0.0,
-                ),
-            )
+            val decorated = when (val target = lookupElement.`object`) {
+                is PsiClass -> lookupElement.withSpaceTail().withMemberAutoPopup()
+                is PsiPackage -> PackageLookupItem(target, className)
+                else -> lookupElement
+            }.withQualifiedLookupString(qualifiedLookupString)
+                .withClassNameReplacement(className.textRange.startOffset, qualifiedLookupString)
+            result.addElement(decorated)
         }
     }
 
-    private fun handleAtName(text: String, memberName: PsiElement, result: CompletionResultSet) {
-        if (memberName !is AtFieldName) {
-            return
-        }
+    private fun findClassSegmentPrefix(parameters: CompletionParameters): String {
+        val offset = parameters.editor.caretModel.offset
+        val element = parameters.originalFile.findElementAt(offset - 1) ?: return ""
+        val className = PsiTreeUtil.getParentOfType(element, AtClassName::class.java, false) ?: return ""
+        val offsetInClassName = (offset - className.textRange.startOffset).coerceIn(0, className.textLength)
+        return className.text.take(offsetInClassName).substringAfterLast('.')
+    }
 
-        val entry = memberName.parent as? AtEntry ?: return
-
+    private fun handleAtName(text: String, entry: AtEntry, module: Module, result: CompletionResultSet) {
         val entryClass = entry.className?.classNameValue ?: return
 
-        val module = ModuleUtilCore.findModuleForPsiElement(memberName) ?: return
         val project = module.project
 
         val mcpModule = MinecraftFacet.getInstance(module)?.getModuleOfType(McpModuleType) ?: return
-
-        val srgMap = mcpModule.mappingsManager?.mappingsNow ?: return
-
-        val srgResult = result.withPrefixMatcher(SrgPrefixMatcher(text))
+        val namespaceMapper = AtNamespaceMapper.create(mcpModule) ?: return
+        val useNamedNames = namespaceMapper.usesNamedNames
 
         for (field in entryClass.fields) {
-            if (!field.name.contains(text, ignoreCase = true)) {
+            val memberReference = namespaceMapper.fromNamed(field)
+            if (
+                !field.name.contains(text, ignoreCase = true) &&
+                !memberReference.name.contains(text, ignoreCase = true)
+            ) {
                 continue
             }
 
-            val memberReference = srgMap.getIntermediaryField(field) ?: field.simpleQualifiedMemberReference
-            srgResult.addElement(
+            result.addElement(
                 PrioritizedLookupElement.withPriority(
                     LookupElementBuilder
-                        .create(field.name)
+                        .create(field, field.name)
+                        .withLookupString(memberReference.name)
                         .withIcon(PlatformIcons.FIELD_ICON)
-                        .withTailText(" (${memberReference.name})", true)
+                        .withTailText(if (useNamedNames) null else " (${memberReference.name})", true)
                         .withInsertHandler handler@{ context, _ ->
                             val currentElement = context.file.findElementAt(context.startOffset) ?: return@handler
                             currentElement.replace(
@@ -255,12 +267,7 @@ class AtCompletionContributor : CompletionContributor() {
                                 ),
                             )
 
-                            // TODO: Fix visibility decrease
-                            PsiDocumentManager.getInstance(context.project)
-                                .doPostponedOperationsAndUnblockDocument(context.document)
-                            val comment = " # ${field.name}"
-                            context.document.insertString(context.editor.caretModel.offset, comment)
-                            context.editor.caretModel.moveCaretRelatively(comment.length, 0, false, false, false)
+                            finishMemberInsertion(context, useNamedNames, field.name)
                         },
                     1.0,
                 ),
@@ -268,16 +275,20 @@ class AtCompletionContributor : CompletionContributor() {
         }
 
         for (method in entryClass.methods) {
-            if (!method.name.contains(text, ignoreCase = true)) {
+            val memberReference = namespaceMapper.fromNamed(method)
+            if (
+                !method.name.contains(text, ignoreCase = true) &&
+                !memberReference.name.contains(text, ignoreCase = true)
+            ) {
                 continue
             }
 
-            val memberReference = srgMap.getIntermediaryMethod(method) ?: method.qualifiedMemberReference
-            srgResult.addElement(
+            result.addElement(
                 PrioritizedLookupElement.withPriority(
-                    LookupElementBuilder.create(method.nameAndParameterTypes)
+                    LookupElementBuilder.create(method, method.nameAndParameterTypes)
+                        .withLookupString(memberReference.name)
                         .withIcon(PlatformIcons.METHOD_ICON)
-                        .withTailText(" (${memberReference.name})", true)
+                        .withTailText(if (useNamedNames) null else " (${memberReference.name})", true)
                         .withInsertHandler handler@{ context, _ ->
                             var currentElement = context.file.findElementAt(context.startOffset) ?: return@handler
                             var counter = 0
@@ -310,12 +321,7 @@ class AtCompletionContributor : CompletionContributor() {
                                 ),
                             )
 
-                            // TODO: Fix visibility decreases
-                            PsiDocumentManager.getInstance(context.project)
-                                .doPostponedOperationsAndUnblockDocument(context.document)
-                            val comment = " # ${method.name}"
-                            context.document.insertString(context.editor.caretModel.offset, comment)
-                            context.editor.caretModel.moveCaretRelatively(comment.length, 0, false, false, false)
+                            finishMemberInsertion(context, useNamedNames, method.name)
                         },
                     0.0,
                 ),
@@ -323,26 +329,74 @@ class AtCompletionContributor : CompletionContributor() {
         }
     }
 
-    private fun handleNewLine(text: String, result: CompletionResultSet) {
+    private fun handleKeyword(text: String, result: CompletionResultSet) {
+        val keywordResult = result.withPrefixMatcher(text)
         for (keyword in AtElementFactory.Keyword.softMatch(text)) {
-            result.addElement(LookupElementBuilder.create(keyword.text))
+            keywordResult.addElement(
+                LookupElementBuilder.create(keyword.text)
+                    .withSpaceTail(),
+            )
         }
     }
 
-    /**
-     * This helps order the (hopefully) most relevant entries in the short name completion
-     */
-    private fun String?.getValue(text: String): Int {
-        if (this == null) {
-            return 0
+    private fun finishMemberInsertion(context: InsertionContext, usesNamedNames: Boolean, namedName: String) {
+        // TODO: Fix visibility decrease
+        PsiDocumentManager.getInstance(context.project)
+            .doPostponedOperationsAndUnblockDocument(context.document)
+        if (!usesNamedNames) {
+            val comment = " # $namedName"
+            context.document.insertString(context.editor.caretModel.offset, comment)
+            context.editor.caretModel.moveCaretRelatively(comment.length, 0, false, false, false)
+        }
+    }
+
+    private fun createClassLookupElement(psiClass: PsiClass, name: String): LookupElement {
+        val lookupElement = JavaClassNameCompletionContributor.createClassLookupItem(psiClass, false)
+        lookupElement.setLookupString(name)
+        psiClass.name?.let { lookupElement.addLookupStrings(it) }
+        return lookupElement.withSpaceTail().withMemberAutoPopup()
+    }
+
+    private fun createBinaryClassLookupElement(psiClass: PsiClass, name: String): LookupElement =
+        LookupElementBuilder.create(psiClass, name)
+            .withIcon(PlatformIcons.CLASS_ICON)
+            .withSpaceTail()
+            .withMemberAutoPopup()
+
+    private fun LookupElement.withSpaceTail(): LookupElement =
+        TailTypeDecorator.withTail(this, TailTypes.spaceType())
+
+    private fun LookupElement.withMemberAutoPopup(): LookupElement =
+        object : LookupElementDecorator<LookupElement>(this) {
+            override fun handleInsert(context: InsertionContext) {
+                super.handleInsert(context)
+                context.setLaterRunnable {
+                    AutoPopupController.getInstance(context.project).scheduleAutoPopup(context.editor)
+                }
+            }
         }
 
-        // Push net.minecraft{forge} classes up to the top
-        val packageBonus = if (this.startsWith("net.minecraft")) 10_000 else 0
+    private fun LookupElement.withQualifiedLookupString(qualifiedLookupString: String): LookupElement =
+        object : LookupElementDecorator<LookupElement>(this) {
+            override fun getLookupString(): String = qualifiedLookupString
 
-        val thisName = this.substringAfterLast('.')
+            override fun getAllLookupStrings(): Set<String> =
+                super.getAllLookupStrings() + qualifiedLookupString
+        }
 
-        return thisName.getSimilarity(text, packageBonus)
+    private fun LookupElement.withClassNameReplacement(
+        classNameStartOffset: Int,
+        qualifiedLookupString: String,
+    ): LookupElement = object : LookupElementDecorator<LookupElement>(this) {
+        override fun handleInsert(context: InsertionContext) {
+            if (classNameStartOffset <= context.tailOffset) {
+                context.document.replaceString(classNameStartOffset, context.tailOffset, qualifiedLookupString)
+                context.tailOffset = classNameStartOffset + qualifiedLookupString.length
+                context.commitDocument()
+            }
+
+            super.handleInsert(context)
+        }
     }
 
     object Const {
@@ -351,6 +405,5 @@ class AtCompletionContributor : CompletionContributor() {
 
         val AFTER_KEYWORD = after(AtTypes.KEYWORD)
         val AFTER_CLASS_NAME = after(AtTypes.CLASS_NAME)
-        val AFTER_NEWLINE = after(AtTypes.CRLF)
     }
 }
