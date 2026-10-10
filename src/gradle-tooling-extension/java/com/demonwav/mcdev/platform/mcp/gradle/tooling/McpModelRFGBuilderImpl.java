@@ -65,6 +65,10 @@ public final class McpModelRFGBuilderImpl implements ModelBuilderService {
             String mappingChannel = getProviderValue(ReflectUtil.getProperty(extension, "mcpMappingChannel"));
             String mappingVersion = getProviderValue(ReflectUtil.getProperty(extension, "mcpMappingVersion"));
             if (minecraftVersion == null || mappingChannel == null || mappingVersion == null) {
+                project.getLogger().info(
+                        "MinecraftDev: RFG project {} is missing mcVersion/mcpMappingChannel/mcpMappingVersion, "
+                                + "skipping MCP model (extensions found: minecraft, mcpTasks)",
+                        project.getPath());
                 return null;
             }
 
@@ -86,6 +90,11 @@ public final class McpModelRFGBuilderImpl implements ModelBuilderService {
                     accessTransformers
             );
         } catch (Exception e) {
+            // RFG internals are accessed reflectively; surface a trace instead of silently
+            // degrading to "no MCP module" when RFG renames something we probe
+            project.getLogger().info(
+                    "MinecraftDev: failed to build RFG MCP model for project {}: {}",
+                    project.getPath(), e.toString());
             return null;
         }
     }
