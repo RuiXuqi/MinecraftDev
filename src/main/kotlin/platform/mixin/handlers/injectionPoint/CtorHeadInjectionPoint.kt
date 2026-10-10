@@ -57,6 +57,8 @@ import org.objectweb.asm.tree.FieldInsnNode
 import org.objectweb.asm.tree.MethodNode
 
 class CtorHeadInjectionPoint : InjectionPoint<PsiElement>() {
+    override val hasSemanticKey: Boolean get() = false
+
     private object Const {
         val ARGS_KEYS = arrayOf("enforce")
     }

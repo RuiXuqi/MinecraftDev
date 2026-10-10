@@ -33,6 +33,8 @@ import org.objectweb.asm.tree.ClassNode
 import org.objectweb.asm.tree.MethodNode
 
 class HeadInjectionPoint : InjectionPoint<PsiElement>() {
+    override val hasSemanticKey: Boolean get() = false
+
     override fun doCreateCollectVisitor(
         at: PsiAnnotation,
         target: MixinSelector?,
