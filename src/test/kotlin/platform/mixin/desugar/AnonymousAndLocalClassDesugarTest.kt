@@ -20,13 +20,53 @@
 
 package com.demonwav.mcdev.platform.mixin.desugar
 
+import com.demonwav.mcdev.framework.createLibrary
 import com.demonwav.mcdev.platform.mixin.handlers.desugar.AnonymousAndLocalClassDesugarer
+import com.demonwav.mcdev.util.rotate
+import com.demonwav.mcdev.util.runWriteTask
+import com.intellij.openapi.roots.ModuleRootModificationUtil
+import com.intellij.openapi.roots.libraries.Library
+import com.intellij.openapi.roots.libraries.LibraryTablesRegistrar
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.objectweb.asm.Opcodes
 
 @Suppress("Convert2Lambda", "CopyConstructorMissesField", "SillyAssignment")
 class AnonymousAndLocalClassDesugarTest : AbstractDesugarTest() {
     override val desugarer = AnonymousAndLocalClassDesugarer
+
+    private var testDataLibrary: Library? = null
+
+    @BeforeEach
+    fun addTestDataLibrary() {
+        runWriteTask {
+            testDataLibrary = createLibrary(project, "mixin-test-data")
+        }
+        ModuleRootModificationUtil.updateModel(module) { model ->
+            model.addLibraryEntry(testDataLibrary ?: throw IllegalStateException("Test data library not created"))
+            val orderEntries = model.orderEntries
+            orderEntries.rotate(1)
+            model.rearrangeOrderEntries(orderEntries)
+        }
+    }
+
+    @AfterEach
+    fun removeTestDataLibrary() {
+        val library = testDataLibrary ?: return
+        ModuleRootModificationUtil.updateModel(module) { model ->
+            model.removeOrderEntry(
+                model.findLibraryOrderEntry(library) ?: throw IllegalStateException("Library not found"),
+            )
+        }
+        runWriteTask {
+            val table = LibraryTablesRegistrar.getInstance().getLibraryTable(project)
+            table.modifiableModel.let { model ->
+                model.removeLibrary(library)
+                model.commit()
+            }
+        }
+    }
 
     @Test
     fun testSimpleAnonymous() {
@@ -734,6 +774,37 @@ class AnonymousAndLocalClassDesugarTest : AbstractDesugarTest() {
                         void print() {
                             super.print();
                             System.out.println(val${'$'}hello + " " + val${'$'}world);
+                        }
+                    }
+                }
+            """.trimIndent()
+        )
+    }
+
+    @Test
+    fun testAnonymousExtendsCompiledClass() {
+        doTest(
+            """
+                import com.demonwav.mcdev.mixintestdata.desugar.BaseWithConstructorArgs;
+
+                class Test {
+                    void test() {
+                        new BaseWithConstructorArgs("hello", 42) {
+                        };
+                    }
+                }
+            """.trimIndent(),
+            """
+                import com.demonwav.mcdev.mixintestdata.desugar.BaseWithConstructorArgs;
+
+                class Test {
+                    void test() {
+                        new $1("hello", 42);
+                    }
+
+                    class $1 extends BaseWithConstructorArgs {
+                        $1(String stringArg, int intArg) {
+                            super(stringArg, intArg);
                         }
                     }
                 }
