@@ -46,6 +46,11 @@ abstract class AbstractDesugarTest : BaseMinecraftTest() {
     }
 
     protected fun doTest(@Language("JAVA") before: String, @Language("JAVA") after: String, classVersion: Int = Opcodes.V21) {
+        // Setup can invalidate the indexes (e.g. adding a library to the module). This has to run outside a
+        // write action, otherwise the reindex cannot proceed and resolving references below fails with
+        // IndexNotReadyException.
+        IndexingTestUtil.waitUntilIndexesAreReady(project)
+
         WriteCommandAction.runWriteCommandAction(project) {
             val codeStyleManager = CodeStyleManager.getInstance(project)
             val javaCodeStyleManager = JavaCodeStyleManager.getInstance(project)
