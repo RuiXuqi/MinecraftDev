@@ -36,6 +36,7 @@ import com.intellij.psi.PsiAnonymousClass
 import com.intellij.psi.PsiCall
 import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiClassObjectAccessExpression
+import com.intellij.psi.PsiCompiledElement
 import com.intellij.psi.PsiDiamondType
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiElementFactory
@@ -200,7 +201,10 @@ object AnonymousAndLocalClassDesugarer : Desugarer() {
 
         localClass.accept(visitor)
         for (info in variableInfos) {
-            info.variable.typeElement?.accept(visitor)
+            val typeElement = info.variable.typeElement ?: continue
+            // Constructor parameters may come from compiled library classes, walking compiled PSI is forbidden
+            if (typeElement is PsiCompiledElement) continue
+            typeElement.accept(visitor)
         }
 
         return typeParameters

@@ -31,6 +31,7 @@ import com.intellij.openapi.util.UnfairTextRange
 import com.intellij.psi.JavaRecursiveElementWalkingVisitor
 import com.intellij.psi.PsiAnonymousClass
 import com.intellij.psi.PsiClass
+import com.intellij.psi.PsiCompiledElement
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiJavaCodeReferenceElement
 import com.intellij.psi.PsiJavaFile
@@ -99,6 +100,7 @@ object DesugarUtil {
     }
 
     fun desugar(project: Project, clazz: PsiClass, context: DesugarContext): PsiClass? {
+        if (clazz is PsiCompiledElement) return null
         val file = clazz.containingFile as? PsiJavaFile ?: return null
         return file.cached {
             val desugaredFile = file.copy() as PsiJavaFile
@@ -170,6 +172,7 @@ object DesugarUtil {
         }
 
         val file = element.containingFile as? PsiJavaFile ?: return emptyList()
+        if (element is PsiCompiledElement) return emptyList()
         val results = mutableListOf<PsiReference>()
 
         ReferencesSearch.search(element, LocalSearchScope(file)).forEach(Processor {
